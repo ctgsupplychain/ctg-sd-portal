@@ -1,0 +1,129 @@
+'use client'
+import { useRouter, usePathname } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
+import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput } from 'lucide-react'
+import clsx from 'clsx'
+
+interface SidebarProps {
+  userEmail?: string
+  userName?: string
+  userRole?: string
+  brands?: string[]
+  activeBrand?: string
+}
+
+export default function Sidebar({ userEmail, userName, userRole, brands = [], activeBrand }: SidebarProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const supabase = createClient()
+
+  const initials = userName
+    ? userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : userEmail?.slice(0, 2).toUpperCase() || '??'
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const isAdmin = userRole === 'admin' || userRole === 'supply_chain'
+
+  return (
+    <div className="w-52 min-w-52 bg-[#1A2535] flex flex-col h-full">
+      {/* Header */}
+      <div className="px-4 py-5 border-b border-white/10">
+        <div className="text-white font-semibold text-sm tracking-wide">CTG Supply Chain</div>
+        <div className="text-white/40 text-xs mt-0.5">Project Owner Portal</div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-2">
+        {isAdmin && (
+          <>
+            <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium">Overview</div>
+            <NavItem
+              icon={<LayoutDashboard size={15} />}
+              label="Dashboard"
+              href="/dashboard"
+              active={pathname === '/dashboard'}
+              onClick={() => router.push('/dashboard')}
+            />
+          </>
+        )}
+
+        {brands.length > 0 && (
+          <>
+            <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium mt-1">My Projects</div>
+            {brands.map(brand => (
+              <NavItem
+                key={brand}
+                icon={<BarChart3 size={15} />}
+                label={brand}
+                href={`/project/${encodeURIComponent(brand)}`}
+                active={activeBrand === brand}
+                onClick={() => router.push(`/project/${encodeURIComponent(brand)}`)}
+              />
+            ))}
+          </>
+        )}
+
+        <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium mt-1">Tools</div>
+        {(userRole === 'buyer' || isAdmin) && (
+          <NavItem
+            icon={<FileInput size={15} />}
+            label="Supply Input"
+            href="/supply-input"
+            active={pathname === '/supply-input'}
+            onClick={() => router.push('/supply-input')}
+          />
+        )}
+        <NavItem
+          icon={<Bell size={15} />}
+          label="Alerts"
+          href="/alerts"
+          active={pathname === '/alerts'}
+          onClick={() => router.push('/alerts')}
+        />
+      </nav>
+
+      {/* User footer */}
+      <div className="px-4 py-4 border-t border-white/10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-full bg-[#048A81]/30 flex items-center justify-center text-[#048A81] text-xs font-semibold flex-shrink-0">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white text-xs font-medium truncate">{userName || userEmail}</div>
+            <div className="text-white/40 text-xs truncate capitalize">{userRole?.replace('_', ' ')}</div>
+          </div>
+          <button onClick={handleLogout} className="text-white/30 hover:text-white/70 transition-colors">
+            <LogOut size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NavItem({ icon, label, href, active, onClick }: {
+  icon: React.ReactNode
+  label: string
+  href: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={clsx(
+        'w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-all border-l-2',
+        active
+          ? 'bg-white/8 text-white border-[#048A81] font-medium'
+          : 'text-white/50 border-transparent hover:text-white/80 hover:bg-white/5'
+      )}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </button>
+  )
+}

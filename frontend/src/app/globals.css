@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-dark: #1A2535;
+  --color-accent: #048A81;
+  --color-warn: #E07B39;
+  --color-danger: #B42318;
+  --color-ok: #166534;
+}
+
+body {
+  background: #F0F2F5;
+  color: #101828;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D0D5DD; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #98A2B3; }
