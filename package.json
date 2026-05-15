@@ -2,8 +2,12 @@
   "name": "ctg-sd-portal-root",
   "version": "0.1.0",
   "private": true,
+  "dependencies": {
+    "next": "15.3.2"
+  },
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
-    "dev": "cd frontend && npm run dev"
+    "dev": "cd frontend && npm run dev",
+    "start": "cd frontend && npm run start"
   }
 }
