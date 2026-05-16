@@ -68,15 +68,24 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
         )}
 
         <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium mt-1">Tools</div>
-        {(userRole === 'buyer' || isAdmin) && (
-          <NavItem
-            icon={<FileInput size={15} />}
-            label="Supply Input"
-            href="/supply-input"
-            active={pathname === '/supply-input'}
-            onClick={() => router.push('/supply-input')}
-          />
-        )}
+{(userRole === 'buyer' || isAdmin) && (
+  <NavItem
+    icon={<FileInput size={15} />}
+    label="Supply Input"
+    href="/supply-input"
+    active={pathname === '/supply-input'}
+    onClick={() => router.push('/supply-input')}
+  />
+)}
+{userRole === 'supply_chain' && (
+  <NavItem
+    icon={<Package size={15} />}
+    label="Inventory Upload"
+    href="/inventory-upload"
+    active={pathname === '/inventory-upload'}
+    onClick={() => router.push('/inventory-upload')}
+  />
+)}
         <NavItem
           icon={<Bell size={15} />}
           label="Alerts"
