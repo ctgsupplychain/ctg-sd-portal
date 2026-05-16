@@ -67,7 +67,7 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
   return (
     <div className="flex flex-col gap-3">
       {/* SKU selector — hidden since parent manages it, but kept for table context */}
-      <div ref={dropdownRef} className="relative" style={{ display: 'none' }}>
+      <div ref={dropdownRef} className="relative min-w-72">
         <button type="button" onClick={() => { setOpen(o => !o); setSearch('') }}
           className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] flex items-center justify-between gap-2">
           <span className="truncate">{selectedLabel}</span>
