@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import clsx from 'clsx'
 import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { FLAG_DISPLAY } from '@/lib/sd-compute'
@@ -8,6 +8,8 @@ interface SDTableProps {
   skus: SkuSdResult[]
   weeks: WeekInfo[]
   currentWk: string
+  selectedSku: string
+  onSkuChange: (sku: string) => void
 }
 
 function fmt(n: number): string {
@@ -20,35 +22,26 @@ function fmtRm(n: number): string {
   return n > 0 ? n.toLocaleString() : '—'
 }
 
-export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
-  const [selectedSku, setSelectedSku] = useState(skus[0]?.sku.sku || '')
+export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChange }: SDTableProps) {
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Sort by description A-Z
   const sortedSkus = useMemo(() =>
-    [...skus].sort((a, b) =>
-      (a.sku.description || '').localeCompare(b.sku.description || '')
-    ), [skus])
+    [...skus].sort((a, b) => (a.sku.description || '').localeCompare(b.sku.description || '')), [skus])
 
-  // Filter by search
   const filteredSkus = useMemo(() =>
-    search.trim() === ''
-      ? sortedSkus
-      : sortedSkus.filter(s =>
-          s.sku.sku.toLowerCase().includes(search.toLowerCase()) ||
-          (s.sku.description || '').toLowerCase().includes(search.toLowerCase())
-        ), [sortedSkus, search])
+    search.trim() === '' ? sortedSkus : sortedSkus.filter(s =>
+      s.sku.sku.toLowerCase().includes(search.toLowerCase()) ||
+      (s.sku.description || '').toLowerCase().includes(search.toLowerCase())
+    ), [sortedSkus, search])
 
   const current = skus.find(s => s.sku.sku === selectedSku) || skus[0]
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setSearch('')
+        setOpen(false); setSearch('')
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -59,86 +52,45 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
 
   const selectedLabel = `${current.sku.sku} — ${(current.sku.description || '').slice(0, 45)}`
 
-  // Group weeks by month
-  const monthSpans: { label: string; count: number; startIdx: number }[] = []
-  let curMon = ''; let curStart = 0; let curCount = 0
-  weeks.forEach((w, i) => {
+  const monthSpans: { label: string; count: number }[] = []
+  let curMon = ''; let curCount = 0
+  weeks.forEach(w => {
     if (w.monthLabel !== curMon) {
-      if (curMon) monthSpans.push({ label: curMon, count: curCount, startIdx: curStart })
-      curMon = w.monthLabel; curStart = i; curCount = 1
+      if (curMon) monthSpans.push({ label: curMon, count: curCount })
+      curMon = w.monthLabel; curCount = 1
     } else { curCount++ }
   })
-  if (curMon) monthSpans.push({ label: curMon, count: curCount, startIdx: curStart })
+  if (curMon) monthSpans.push({ label: curMon, count: curCount })
 
   const flag = FLAG_DISPLAY[current.flag]
 
   return (
     <div className="flex flex-col gap-3">
-      {/* SKU selector */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-medium text-[#344054]">Select SKU</span>
-
-        {/* Custom searchable dropdown */}
-        <div ref={dropdownRef} className="relative min-w-72">
-          {/* Trigger */}
-          <button
-            type="button"
-            onClick={() => { setOpen(o => !o); setSearch('') }}
-            className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] flex items-center justify-between gap-2"
-          >
-            <span className="truncate">{selectedLabel}</span>
-            <svg className="w-4 h-4 text-[#667085] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {/* Dropdown panel */}
-          {open && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-[#D0D5DD] rounded-lg shadow-lg">
-              {/* Search input inside dropdown */}
-              <div className="p-2 border-b border-[#EAECF0]">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Search SKU or description..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#048A81]"
-                />
-              </div>
-              {/* Options list */}
-              <ul className="max-h-60 overflow-y-auto py-1">
-                {filteredSkus.length === 0 && (
-                  <li className="px-3 py-2 text-sm text-[#667085]">No results found</li>
-                )}
-                {filteredSkus.map(s => (
-                  <li
-                    key={s.sku.sku}
-                    onClick={() => {
-                      setSelectedSku(s.sku.sku)
-                      setOpen(false)
-                      setSearch('')
-                    }}
-                    className={clsx(
-                      'px-3 py-2 text-sm cursor-pointer hover:bg-[#F9FAFB]',
-                      s.sku.sku === selectedSku ? 'bg-[#F0FAF9] text-[#048A81] font-medium' : 'text-[#101828]'
-                    )}
-                  >
-                    {s.sku.sku} — {(s.sku.description || '').slice(0, 50)}
-                  </li>
-                ))}
-              </ul>
+      {/* SKU selector — hidden since parent manages it, but kept for table context */}
+      <div ref={dropdownRef} className="relative" style={{ display: 'none' }}>
+        <button type="button" onClick={() => { setOpen(o => !o); setSearch('') }}
+          className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] flex items-center justify-between gap-2">
+          <span className="truncate">{selectedLabel}</span>
+        </button>
+        {open && (
+          <div className="absolute z-50 mt-1 w-full bg-white border border-[#D0D5DD] rounded-lg shadow-lg">
+            <div className="p-2 border-b border-[#EAECF0]">
+              <input autoFocus type="text" placeholder="Search SKU or description..." value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#048A81]" />
             </div>
-          )}
-        </div>
-
-        <span className="text-xs text-[#667085] bg-[#F2F4F7] px-2.5 py-1 rounded-full">
-          {current.sku.uom || 'Unit'} · MOQ {(current.sku.moq || 0).toLocaleString()} · LT {current.sku.leadTimeWk || 0} wks
-        </span>
-        <span className="ml-auto text-sm font-semibold" style={{ color: flag.color }}>
-          {flag.emoji} {flag.label}
-        </span>
-        <span className="text-sm text-[#667085]">WoC: <b>{current.weeksOfCover}</b> wks</span>
+            <ul className="max-h-60 overflow-y-auto py-1">
+              {filteredSkus.length === 0 && <li className="px-3 py-2 text-sm text-[#667085]">No results</li>}
+              {filteredSkus.map(s => (
+                <li key={s.sku.sku} onClick={() => { onSkuChange(s.sku.sku); setOpen(false); setSearch('') }}
+                  className={clsx('px-3 py-2 text-sm cursor-pointer hover:bg-[#F9FAFB]',
+                    s.sku.sku === selectedSku ? 'bg-[#F0FAF9] text-[#048A81] font-medium' : 'text-[#101828]')}>
+                  {s.sku.sku} — {(s.sku.description || '').slice(0, 50)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -148,7 +100,8 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
             <tr>
               <th className="bg-[#F9FAFB] border-b border-r border-[#EAECF0] px-3 py-2 text-left text-[#667085] font-medium w-28 sticky left-0 z-10">Row</th>
               {monthSpans.map(span => (
-                <th key={span.label} colSpan={span.count} className="bg-[#048A81] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide">
+                <th key={span.label} colSpan={span.count}
+                  className="bg-[#048A81] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide">
                   {span.label}
                 </th>
               ))}
@@ -156,7 +109,9 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
             <tr>
               <th className="bg-[#F9FAFB] border-b border-r border-[#EAECF0] px-3 py-2 sticky left-0 z-10"></th>
               {weeks.map(w => (
-                <th key={w.label} className={clsx('text-center px-2 py-1.5 font-semibold text-xs border-b border-r border-[#EAECF0] min-w-[68px]', w.label === currentWk ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#2E4057] text-white')}>
+                <th key={w.label} className={clsx(
+                  'text-center px-2 py-1.5 font-semibold text-xs border-b border-r border-[#EAECF0] min-w-[68px]',
+                  w.label === currentWk ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#2E4057] text-white')}>
                   <div>{w.label}</div>
                   <div className="font-normal text-[10px] opacity-70">{w.mondayDate.slice(5)}</div>
                 </th>
@@ -166,8 +121,8 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
           <tbody>
             <SDRow label="Forecast RM'000" values={current.weeks.map(w => fmtRm(w.forecastRm))} weeks={weeks} currentWk={currentWk} rowStyle="fcast" />
             <SDRow label="Forecast Qty" values={current.weeks.map(w => fmt(w.forecastQty))} weeks={weeks} currentWk={currentWk} rowStyle="qty" />
-            <SDRow label="Supply (Commit)" values={current.weeks.map(w => fmt(w.supplyCommit))} weeks={weeks} currentWk={currentWk} rowStyle="commit" />
             <SDRow label="Supply (Uncommit)" values={current.weeks.map(w => fmt(w.supplyUncommit))} weeks={weeks} currentWk={currentWk} rowStyle="uncommit" />
+            <SDRow label="Supply (Commit)" values={current.weeks.map(w => fmt(w.supplyCommit))} weeks={weeks} currentWk={currentWk} rowStyle="commit" />
             <SDRow label="Balance" values={current.weeks.map(w => fmt(w.balance))} weeks={weeks} currentWk={currentWk} rowStyle="balance" balanceValues={current.weeks.map(w => w.balance)} />
           </tbody>
         </table>
@@ -208,7 +163,12 @@ function SDRow({ label, values, weeks, currentWk, rowStyle, balanceValues }: {
         const isCurrent = w.label === currentWk
         const isNeg = rowStyle === 'balance' && balanceValues && balanceValues[i] < 0
         return (
-          <td key={w.label} className={clsx('text-center px-1.5 py-1.5 border-b border-r border-[#EAECF0] text-xs tabular-nums', rowBg[rowStyle], cellColor[rowStyle], isCurrent && rowStyle !== 'balance' && 'bg-[#FFFBEB]', isCurrent && rowStyle === 'balance' && 'bg-[#2E3D50]', isNeg && '!text-[#FDA29B]')}>
+          <td key={w.label} className={clsx(
+            'text-center px-1.5 py-1.5 border-b border-r border-[#EAECF0] text-xs tabular-nums',
+            rowBg[rowStyle], cellColor[rowStyle],
+            isCurrent && rowStyle !== 'balance' && 'bg-[#FFFBEB]',
+            isCurrent && rowStyle === 'balance' && 'bg-[#2E3D50]',
+            isNeg && '!text-[#FDA29B]')}>
             {values[i]}
           </td>
         )
