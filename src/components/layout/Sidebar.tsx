@@ -2,7 +2,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import clsx from 'clsx'
-import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput, RefreshCw, Database } from 'lucide-react'
 
 interface SidebarProps {
   userEmail?: string
@@ -93,6 +93,15 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
     href="/forecast-sync"
     active={pathname === '/forecast-sync'}
     onClick={() => router.push('/forecast-sync')}
+  />
+)}
+        {userRole === 'supply_chain' && (
+  <NavItem
+    icon={<Database size={15} />}
+    label="Master SKU"
+    href="/master-sku"
+    active={pathname === '/master-sku'}
+    onClick={() => router.push('/master-sku')}
   />
 )}
         <NavItem
