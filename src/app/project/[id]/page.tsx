@@ -144,7 +144,7 @@ if (stockDates[0]) setLastUpdated(stockDates[0])
     setLoading(false)
   }
 
-  const criticalSkus = skuResults.filter(s => ['STOCKOUT','PULL_IN','ORDER_NOW'].includes(s.flag))
+ const criticalSkus: SkuSdResult[] = []
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F0F2F5]">
