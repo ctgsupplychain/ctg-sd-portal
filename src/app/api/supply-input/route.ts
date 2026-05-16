@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true })
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '', range: 2 })
 
     if (!rows.length) return NextResponse.json({ error: 'No data in file' }, { status: 400 })
 
