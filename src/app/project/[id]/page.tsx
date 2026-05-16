@@ -85,13 +85,21 @@ stockData?.forEach((s: any) => {
   }
 })
 if (stockDates[0]) setLastUpdated(stockDates[0])
-    const { data: fcstData } = await supabase
-      .from('sales_forecast')
-      .select('*')
-      .eq('brand', brand)
-      .order('submitted_at', { ascending: false })
-      .limit(1)
-      .single()
+    // Get project_id from projects table matching brand
+const { data: projectData } = await supabase
+  .from('projects')
+  .select('id')
+  .eq('brand', brand)
+  .limit(1)
+  .single()
+
+const { data: fcstData } = await supabase
+  .from('sales_forecast')
+  .select('*')
+  .eq('project_id', projectData?.id || '')
+  .order('submitted_at', { ascending: false })
+  .limit(1)
+  .single()
 
     const forecast = fcstData || null
 
