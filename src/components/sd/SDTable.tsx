@@ -41,7 +41,8 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false); setSearch('')
+        setOpen(false)
+        setSearch('')
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -51,57 +52,79 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
   if (!current) return null
 
   const selectedLabel = `${current.sku.sku} — ${(current.sku.description || '').slice(0, 45)}`
+  const flag = FLAG_DISPLAY[current.flag]
 
   const monthSpans: { label: string; count: number }[] = []
-  let curMon = ''; let curCount = 0
+  let curMon = ''
+  let curCount = 0
   weeks.forEach(w => {
     if (w.monthLabel !== curMon) {
       if (curMon) monthSpans.push({ label: curMon, count: curCount })
-      curMon = w.monthLabel; curCount = 1
-    } else { curCount++ }
+      curMon = w.monthLabel
+      curCount = 1
+    } else {
+      curCount++
+    }
   })
   if (curMon) monthSpans.push({ label: curMon, count: curCount })
 
-  const flag = FLAG_DISPLAY[current.flag]
-
   return (
-    <div className="flex items-center gap-3 flex-wrap">
-  <div ref={dropdownRef} className="relative w-72">
-    <button type="button" onClick={() => { setOpen(o => !o); setSearch('') }}
-      className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] flex items-center justify-between gap-2">
-      <span className="truncate text-sm">{selectedLabel}</span>
-      <svg className="w-4 h-4 text-[#667085] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
-    {open && (
-      <div className="absolute z-50 mt-1 w-full bg-white border border-[#D0D5DD] rounded-lg shadow-lg">
-        <div className="p-2 border-b border-[#EAECF0]">
-          <input autoFocus type="text" placeholder="Search SKU or description..." value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#048A81]" />
+    <div className="flex flex-col gap-3">
+
+      {/* SKU selector row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div ref={dropdownRef} className="relative w-72">
+          <button
+            type="button"
+            onClick={() => { setOpen(o => !o); setSearch('') }}
+            className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] flex items-center justify-between gap-2"
+          >
+            <span className="truncate text-sm">{selectedLabel}</span>
+            <svg className="w-4 h-4 text-[#667085] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {open && (
+            <div className="absolute z-50 mt-1 w-full bg-white border border-[#D0D5DD] rounded-lg shadow-lg">
+              <div className="p-2 border-b border-[#EAECF0]">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search SKU or description..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#048A81]"
+                />
+              </div>
+              <ul className="max-h-60 overflow-y-auto py-1">
+                {filteredSkus.length === 0 && (
+                  <li className="px-3 py-2 text-sm text-[#667085]">No results</li>
+                )}
+                {filteredSkus.map(s => (
+                  <li
+                    key={s.sku.sku}
+                    onClick={() => { onSkuChange(s.sku.sku); setOpen(false); setSearch('') }}
+                    className={clsx(
+                      'px-3 py-2 text-sm cursor-pointer hover:bg-[#F9FAFB]',
+                      s.sku.sku === selectedSku ? 'bg-[#F0FAF9] text-[#048A81] font-medium' : 'text-[#101828]'
+                    )}
+                  >
+                    {s.sku.sku} — {(s.sku.description || '').slice(0, 50)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-        <ul className="max-h-60 overflow-y-auto py-1">
-          {filteredSkus.length === 0 && <li className="px-3 py-2 text-sm text-[#667085]">No results</li>}
-          {filteredSkus.map(s => (
-            <li key={s.sku.sku} onClick={() => { onSkuChange(s.sku.sku); setOpen(false); setSearch('') }}
-              className={clsx('px-3 py-2 text-sm cursor-pointer hover:bg-[#F9FAFB]',
-                s.sku.sku === selectedSku ? 'bg-[#F0FAF9] text-[#048A81] font-medium' : 'text-[#101828]')}>
-              {s.sku.sku} — {(s.sku.description || '').slice(0, 50)}
-            </li>
-          ))}
-        </ul>
+
+        <span className="text-xs text-[#667085] bg-[#F2F4F7] px-2.5 py-1 rounded-full">
+          {current.sku.uom || 'Unit'} · MOQ {(current.sku.moq || 0).toLocaleString()} · LT {current.sku.leadTimeWk || 0} wks
+        </span>
+        <span className="ml-auto text-sm font-semibold" style={{ color: flag.color }}>
+          {flag.emoji} {flag.label}
+        </span>
+        <span className="text-sm text-[#667085]">WoC: <b>{current.weeksOfCover}</b> wks</span>
       </div>
-    )}
-  </div>
-  <span className="text-xs text-[#667085] bg-[#F2F4F7] px-2.5 py-1 rounded-full">
-    {current.sku.uom || 'Unit'} · MOQ {(current.sku.moq || 0).toLocaleString()} · LT {current.sku.leadTimeWk || 0} wks
-  </span>
-  <span className="ml-auto text-sm font-semibold" style={{ color: flag.color }}>
-    {flag.emoji} {flag.label}
-  </span>
-  <span className="text-sm text-[#667085]">WoC: <b>{current.weeksOfCover}</b> wks</span>
-</div>
 
       {/* Table */}
       <div className="border border-[#EAECF0] rounded-xl overflow-hidden overflow-x-auto">
@@ -121,7 +144,8 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
               {weeks.map(w => (
                 <th key={w.label} className={clsx(
                   'text-center px-2 py-1.5 font-semibold text-xs border-b border-r border-[#EAECF0] min-w-[68px]',
-                  w.label === currentWk ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#2E4057] text-white')}>
+                  w.label === currentWk ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#2E4057] text-white'
+                )}>
                   <div>{w.label}</div>
                   <div className="font-normal text-[10px] opacity-70">{w.mondayDate.slice(5)}</div>
                 </th>
@@ -178,7 +202,8 @@ function SDRow({ label, values, weeks, currentWk, rowStyle, balanceValues }: {
             rowBg[rowStyle], cellColor[rowStyle],
             isCurrent && rowStyle !== 'balance' && 'bg-[#FFFBEB]',
             isCurrent && rowStyle === 'balance' && 'bg-[#2E3D50]',
-            isNeg && '!text-[#FDA29B]')}>
+            isNeg && '!text-[#FDA29B]'
+          )}>
             {values[i]}
           </td>
         )
