@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
       if (row['Safety Stock'] != null && row['Safety Stock'] !== '') record.safety_stock = parseInt(row['Safety Stock']) || 0
       if (row['Buffer Stock'] != null && row['Buffer Stock'] !== '') record.buffer_stock = parseInt(row['Buffer Stock']) || 0
       if (row['Status'] != null && String(row['Status']).trim()) record.status = String(row['Status']).trim()
-      if (row['Category'] != null && String(row['Category']).trim()) record.category = String(row['Category']).trim()
-      if (row['Notes'] != null && String(row['Notes']).trim()) record.notes = String(row['Notes']).trim()
+      if (row['Category'] != null && String(row['Category']).trim()) record.demand_source = String(row['Category']).trim()
+      if (row['Notes'] != null && String(row['Notes']).trim()) record.remarks = String(row['Notes']).trim()
 
       toUpsert.push(record)
       if (isNew) inserted.push(sku)
