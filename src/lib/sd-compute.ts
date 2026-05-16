@@ -61,13 +61,15 @@ function getForecastQty(
   sku: SkuMaster,
   year: number,
   month: number,
+  wkLabel: string,
   forecast: Record<string, number> | null,
-  historicalAvg: number
+  historicalAvg: number,
+  demandForecast: Map<string, number> | null   // wkLabel → qty from demand_forecast table
 ): number {
   const wksInMonth = MONTH_WEEKS[month] || 4
 
   if (sku.avgSellingPrice > 0 && forecast) {
-    // ASP > 0: use Google Sheet forecast
+    // ASP > 0: use Google Sheet forecast (Revenue / ASP model)
     const colKey = Object.entries(MONTHLY_FORECAST_COLS).find(
       ([, [y, m]]) => y === year && m === month
     )?.[0]
@@ -77,7 +79,12 @@ function getForecastQty(
     }
     return 0
   } else {
-    // ASP = 0: use trailing 13-week historical average
+    // ASP = 0: priority order:
+    //   1. Statistical demand forecast (from demand_forecast table)
+    //   2. Trailing historical average (legacy fallback)
+    //   3. Zero
+    const statForecast = demandForecast?.get(wkLabel)
+    if (statForecast !== undefined && statForecast > 0) return statForecast
     return Math.ceil(historicalAvg)
   }
 }
@@ -89,14 +96,16 @@ export function computeSD(params: {
   weeks: WeekInfo[]
   forecast: Record<string, number> | null
   historicalAvg: number
-  supplyCommits: Record<string, number>   // wkLabel → qty
-  supplyUncommits: Record<string, number> // wkLabel → qty
+  demandForecast?: Map<string, number> | null  // wkLabel → qty from demand_forecast table
+  supplyCommits: Record<string, number>        // wkLabel → qty
+  supplyUncommits: Record<string, number>      // wkLabel → qty
   currentWk: string
   thresholdOrderNow: number   // default 4
   thresholdMonitor: number    // default 8
 }): SkuSdResult {
   const {
     sku, onHand, weeks, forecast, historicalAvg,
+    demandForecast = null,
     supplyCommits, supplyUncommits, currentWk,
     thresholdOrderNow = 4, thresholdMonitor = 8
   } = params
@@ -105,7 +114,7 @@ export function computeSD(params: {
   const weeklyRows: WeeklyRow[] = []
 
   for (const wk of weeks) {
-    const forecastQty = getForecastQty(sku, wk.year, wk.month, forecast, historicalAvg)
+    const forecastQty = getForecastQty(sku, wk.year, wk.month, wk.label, forecast, historicalAvg, demandForecast)
     const commit   = supplyCommits[wk.label]   || 0
     const uncommit = supplyUncommits[wk.label] || 0
     const forecastRm = sku.avgSellingPrice > 0 && forecast
