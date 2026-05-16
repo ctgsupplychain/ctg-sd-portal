@@ -71,21 +71,20 @@ export default function ProjectPage() {
       .eq('status', 'Active')
 
     const { data: stockData } = await supabase
-      .from('stock_snapshot')
-      .select('*')
-      .in('master_sku', skuData?.map((s: any) => s.sku) || [])
-      .order('report_date', { ascending: false })
+  .from('wms_inventory_snapshots')
+  .select('sku, atp, snapshot_date')
+  .in('sku', skuData?.map((s: any) => s.sku) || [])
+  .order('snapshot_date', { ascending: false })
 
-    const latestStock: Record<string, number> = {}
-    const stockDates: string[] = []
-    stockData?.forEach((s: any) => {
-      if (!latestStock[s.master_sku]) {
-        latestStock[s.master_sku] = s.usable_qty
-        stockDates.push(s.report_date)
-      }
-    })
-    if (stockDates[0]) setLastUpdated(stockDates[0])
-
+const latestStock: Record<string, number> = {}
+const stockDates: string[] = []
+stockData?.forEach((s: any) => {
+  if (!latestStock[s.sku]) {
+    latestStock[s.sku] = s.atp
+    stockDates.push(s.snapshot_date)
+  }
+})
+if (stockDates[0]) setLastUpdated(stockDates[0])
     const { data: fcstData } = await supabase
       .from('sales_forecast')
       .select('*')
