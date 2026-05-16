@@ -1,7 +1,6 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput } from 'lucide-react'
 import clsx from 'clsx'
 import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput, RefreshCw } from 'lucide-react'
 
