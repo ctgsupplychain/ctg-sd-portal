@@ -56,10 +56,13 @@ export async function POST(req: NextRequest) {
       // Build record — only include non-null/non-empty values
       const record: any = { sku }
 
-// For new SKUs only — set brand and description
 if (isNew) {
+  // New SKUs — set brand and description
   if (brand) record.brand = brand
   if (row['Description'] != null && String(row['Description']).trim()) record.description = String(row['Description']).trim()
+} else {
+  // Existing SKUs — must include brand to satisfy not-null constraint
+  record.brand = brand || undefined
 }
       if (row['UOM'] != null && String(row['UOM']).trim()) record.uom = String(row['UOM']).trim()
       if (row['MOQ'] != null && row['MOQ'] !== '') record.moq = parseInt(row['MOQ']) || 0
@@ -79,15 +82,26 @@ if (isNew) {
     if (!toUpsert.length) {
       return NextResponse.json({ error: 'No valid rows to process.' }, { status: 400 })
     }
+    // Separate inserts and updates
+const newRecords = toUpsert.filter(r => inserted.includes(r.sku))
+const updateRecords = toUpsert.filter(r => updated.includes(r.sku))
 
-    const { error: upsertErr } = await supabase
-      .from('master_sku')
-      .upsert(toUpsert, { onConflict: 'sku' })
+// Insert new SKUs
+if (newRecords.length > 0) {
+  const { error: insertErr } = await supabase.from('master_sku').insert(newRecords)
+  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
+}
 
-    if (upsertErr) {
-      console.error('Upsert error:', upsertErr)
-      return NextResponse.json({ error: upsertErr.message }, { status: 500 })
-    }
+// Update existing SKUs one by one (partial update — only changed fields)
+for (const rec of updateRecords) {
+  const { sku, ...fields } = rec
+  const { error: updateErr } = await supabase
+    .from('master_sku')
+    .update(fields)
+    .eq('sku', sku)
+  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+}
+    
 
     return NextResponse.json({
       success: true,
