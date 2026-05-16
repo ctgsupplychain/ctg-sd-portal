@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import clsx from 'clsx'
 import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { FLAG_DISPLAY } from '@/lib/sd-compute'
@@ -23,6 +23,8 @@ function fmtRm(n: number): string {
 export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
   const [selectedSku, setSelectedSku] = useState(skus[0]?.sku.sku || '')
   const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Sort by description A-Z
   const sortedSkus = useMemo(() =>
@@ -30,7 +32,7 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
       (a.sku.description || '').localeCompare(b.sku.description || '')
     ), [skus])
 
-  // Filter by search (partial match on SKU code or description)
+  // Filter by search
   const filteredSkus = useMemo(() =>
     search.trim() === ''
       ? sortedSkus
@@ -40,9 +42,24 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
         ), [sortedSkus, search])
 
   const current = skus.find(s => s.sku.sku === selectedSku) || skus[0]
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
   if (!current) return null
 
-  // Group weeks by month for header
+  const selectedLabel = `${current.sku.sku} — ${(current.sku.description || '').slice(0, 45)}`
+
+  // Group weeks by month
   const monthSpans: { label: string; count: number; startIdx: number }[] = []
   let curMon = ''; let curStart = 0; let curCount = 0
   weeks.forEach((w, i) => {
@@ -61,30 +78,59 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm font-medium text-[#344054]">Select SKU</span>
 
-        {/* Search input */}
-        <input
-          type="text"
-          placeholder="Search SKU or description..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] w-56"
-        />
+        {/* Custom searchable dropdown */}
+        <div ref={dropdownRef} className="relative min-w-72">
+          {/* Trigger */}
+          <button
+            type="button"
+            onClick={() => { setOpen(o => !o); setSearch('') }}
+            className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] flex items-center justify-between gap-2"
+          >
+            <span className="truncate">{selectedLabel}</span>
+            <svg className="w-4 h-4 text-[#667085] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
-        {/* Dropdown */}
-        <select
-          value={selectedSku}
-          onChange={e => setSelectedSku(e.target.value)}
-          className="text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] min-w-64"
-        >
-          {filteredSkus.length === 0 && (
-            <option disabled>No results</option>
+          {/* Dropdown panel */}
+          {open && (
+            <div className="absolute z-50 mt-1 w-full bg-white border border-[#D0D5DD] rounded-lg shadow-lg">
+              {/* Search input inside dropdown */}
+              <div className="p-2 border-b border-[#EAECF0]">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search SKU or description..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#048A81]"
+                />
+              </div>
+              {/* Options list */}
+              <ul className="max-h-60 overflow-y-auto py-1">
+                {filteredSkus.length === 0 && (
+                  <li className="px-3 py-2 text-sm text-[#667085]">No results found</li>
+                )}
+                {filteredSkus.map(s => (
+                  <li
+                    key={s.sku.sku}
+                    onClick={() => {
+                      setSelectedSku(s.sku.sku)
+                      setOpen(false)
+                      setSearch('')
+                    }}
+                    className={clsx(
+                      'px-3 py-2 text-sm cursor-pointer hover:bg-[#F9FAFB]',
+                      s.sku.sku === selectedSku ? 'bg-[#F0FAF9] text-[#048A81] font-medium' : 'text-[#101828]'
+                    )}
+                  >
+                    {s.sku.sku} — {(s.sku.description || '').slice(0, 50)}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
-          {filteredSkus.map(s => (
-            <option key={s.sku.sku} value={s.sku.sku}>
-              {s.sku.sku} — {(s.sku.description || '').slice(0, 45)}
-            </option>
-          ))}
-        </select>
+        </div>
 
         <span className="text-xs text-[#667085] bg-[#F2F4F7] px-2.5 py-1 rounded-full">
           {current.sku.uom || 'Unit'} · MOQ {(current.sku.moq || 0).toLocaleString()} · LT {current.sku.leadTimeWk || 0} wks
@@ -99,32 +145,18 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
       <div className="border border-[#EAECF0] rounded-xl overflow-hidden overflow-x-auto">
         <table className="text-xs border-collapse" style={{ minWidth: `${100 + weeks.length * 70}px` }}>
           <thead>
-            {/* Month row */}
             <tr>
               <th className="bg-[#F9FAFB] border-b border-r border-[#EAECF0] px-3 py-2 text-left text-[#667085] font-medium w-28 sticky left-0 z-10">Row</th>
               {monthSpans.map(span => (
-                <th
-                  key={span.label}
-                  colSpan={span.count}
-                  className="bg-[#048A81] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide"
-                >
+                <th key={span.label} colSpan={span.count} className="bg-[#048A81] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide">
                   {span.label}
                 </th>
               ))}
             </tr>
-            {/* Week row */}
             <tr>
               <th className="bg-[#F9FAFB] border-b border-r border-[#EAECF0] px-3 py-2 sticky left-0 z-10"></th>
               {weeks.map(w => (
-                <th
-                  key={w.label}
-                  className={clsx(
-                    'text-center px-2 py-1.5 font-semibold text-xs border-b border-r border-[#EAECF0] min-w-[68px]',
-                    w.label === currentWk
-                      ? 'bg-[#FEF3C7] text-[#92400E]'
-                      : 'bg-[#2E4057] text-white'
-                  )}
-                >
+                <th key={w.label} className={clsx('text-center px-2 py-1.5 font-semibold text-xs border-b border-r border-[#EAECF0] min-w-[68px]', w.label === currentWk ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#2E4057] text-white')}>
                   <div>{w.label}</div>
                   <div className="font-normal text-[10px] opacity-70">{w.mondayDate.slice(5)}</div>
                 </th>
@@ -162,55 +194,21 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
 type RowStyle = 'fcast' | 'qty' | 'commit' | 'uncommit' | 'balance'
 
 function SDRow({ label, values, weeks, currentWk, rowStyle, balanceValues }: {
-  label: string
-  values: string[]
-  weeks: WeekInfo[]
-  currentWk: string
-  rowStyle: RowStyle
-  balanceValues?: number[]
+  label: string; values: string[]; weeks: WeekInfo[]
+  currentWk: string; rowStyle: RowStyle; balanceValues?: number[]
 }) {
-  const rowBg: Record<RowStyle, string> = {
-    fcast:    'bg-[#F5F5F5]',
-    qty:      'bg-[#F0FAF0]',
-    commit:   'bg-[#EFF6FF]',
-    uncommit: 'bg-[#FFF7ED]',
-    balance:  'bg-[#1A2535]',
-  }
-  const labelColor: Record<RowStyle, string> = {
-    fcast:    'text-[#667085]',
-    qty:      'text-[#667085]',
-    commit:   'text-[#667085]',
-    uncommit: 'text-[#667085]',
-    balance:  'text-[#9DB4CC]',
-  }
-  const cellColor: Record<RowStyle, string> = {
-    fcast:    'text-[#344054]',
-    qty:      'text-[#344054]',
-    commit:   'text-[#1849A9] font-medium',
-    uncommit: 'text-[#B45309]',
-    balance:  'text-white font-semibold',
-  }
+  const rowBg: Record<RowStyle, string> = { fcast: 'bg-[#F5F5F5]', qty: 'bg-[#F0FAF0]', commit: 'bg-[#EFF6FF]', uncommit: 'bg-[#FFF7ED]', balance: 'bg-[#1A2535]' }
+  const labelColor: Record<RowStyle, string> = { fcast: 'text-[#667085]', qty: 'text-[#667085]', commit: 'text-[#667085]', uncommit: 'text-[#667085]', balance: 'text-[#9DB4CC]' }
+  const cellColor: Record<RowStyle, string> = { fcast: 'text-[#344054]', qty: 'text-[#344054]', commit: 'text-[#1849A9] font-medium', uncommit: 'text-[#B45309]', balance: 'text-white font-semibold' }
 
   return (
     <tr>
-      <td className={clsx('px-3 py-1.5 font-medium text-xs border-b border-r border-[#EAECF0] sticky left-0 z-10 w-28', rowBg[rowStyle], labelColor[rowStyle])}>
-        {label}
-      </td>
+      <td className={clsx('px-3 py-1.5 font-medium text-xs border-b border-r border-[#EAECF0] sticky left-0 z-10 w-28', rowBg[rowStyle], labelColor[rowStyle])}>{label}</td>
       {weeks.map((w, i) => {
         const isCurrent = w.label === currentWk
         const isNeg = rowStyle === 'balance' && balanceValues && balanceValues[i] < 0
         return (
-          <td
-            key={w.label}
-            className={clsx(
-              'text-center px-1.5 py-1.5 border-b border-r border-[#EAECF0] text-xs tabular-nums',
-              rowBg[rowStyle],
-              cellColor[rowStyle],
-              isCurrent && rowStyle !== 'balance' && 'bg-[#FFFBEB]',
-              isCurrent && rowStyle === 'balance' && 'bg-[#2E3D50]',
-              isNeg && '!text-[#FDA29B]'
-            )}
-          >
+          <td key={w.label} className={clsx('text-center px-1.5 py-1.5 border-b border-r border-[#EAECF0] text-xs tabular-nums', rowBg[rowStyle], cellColor[rowStyle], isCurrent && rowStyle !== 'balance' && 'bg-[#FFFBEB]', isCurrent && rowStyle === 'balance' && 'bg-[#2E3D50]', isNeg && '!text-[#FDA29B]')}>
             {values[i]}
           </td>
         )
