@@ -1,0 +1,171 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import * as XLSX from 'xlsx'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// Convert DD/MM/YYYY string to ISO date or null
+function parseDate(val: any): string | null {
+  if (!val) return null
+  if (val instanceof Date) return val.toISOString().split('T')[0]
+  const str = String(val).trim()
+  if (!str) return null
+  // DD/MM/YYYY
+  const ddmm = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (ddmm) return `${ddmm[3]}-${ddmm[2].padStart(2,'0')}-${ddmm[1].padStart(2,'0')}`
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+  // Excel serial number
+  const num = parseFloat(str)
+  if (!isNaN(num) && num > 40000) {
+    const d = new Date(Math.round((num - 25569) * 86400 * 1000))
+    return d.toISOString().split('T')[0]
+  }
+  return null
+}
+
+// Convert delivery_date to WK label e.g. "WK22"
+function dateToWkLabel(dateStr: string): string {
+  const d = new Date(dateStr)
+  const startOfYear = new Date(d.getFullYear(), 0, 1)
+  const weekNum = Math.ceil(((d.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
+  return `WK${weekNum}`
+}
+
+// Add weeks to a date string
+function addWeeks(dateStr: string, weeks: number): string {
+  const d = new Date(dateStr)
+  d.setDate(d.getDate() + weeks * 7)
+  return d.toISOString().split('T')[0]
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Auth check
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'supply_chain') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    // Parse file
+    const formData = await req.formData()
+    const file = formData.get('file') as File
+    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+
+    const arrayBuffer = await file.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (!rows.length) return NextResponse.json({ error: 'No data in file' }, { status: 400 })
+
+    // Load master_sku lead times for uncommit calculation
+    const { data: skuData } = await supabase.from('master_sku').select('sku, lead_time_wk')
+    const leadTimeMap: Record<string, number> = {}
+    skuData?.forEach((s: any) => { leadTimeMap[s.sku] = s.lead_time_wk || 0 })
+
+    const mapped = rows
+      .filter(row => row['PO Number *'] && row['SKU *'])
+      .map(row => {
+        const sku = String(row['SKU *']).trim()
+        const deliveryDate = parseDate(row['Delivery Date'])
+        const orderDate = parseDate(row['Order Date *'])
+        const leadTime = Number(row['Lead Time (wks)']) || leadTimeMap[sku] || 0
+
+        // Compute receipt_wk and commit_status
+        let receiptWk: string | null = null
+        let commitStatus: string = 'Uncommit'
+
+        if (deliveryDate) {
+          receiptWk = dateToWkLabel(deliveryDate)
+          commitStatus = 'Commit'
+        } else if (orderDate && leadTime > 0) {
+          const estimatedDelivery = addWeeks(orderDate, leadTime)
+          receiptWk = dateToWkLabel(estimatedDelivery)
+          commitStatus = 'Uncommit'
+        }
+
+        const qtyOrdered = Number(row['Qty Ordered *']) || 0
+        const qtyShipped = Number(row['Qty Shipped']) || 0
+        const unitPrice = Number(row['Unit Price (RM)*']) || 0
+        const taxPct = Number(row['Tax %']) || 0
+        const subtotal = qtyOrdered * unitPrice
+        const taxAmount = subtotal * taxPct / 100
+        const poTotal = subtotal + taxAmount
+
+        return {
+          po_number:     String(row['PO Number *']).trim(),
+          sku,
+          supplier_name: String(row['Supplier Name *'] || '').trim() || null,
+          uom:           String(row['UOM *'] || '').trim() || null,
+          qty:           qtyOrdered,
+          qty_shipped:   qtyShipped,
+          balance_qty:   qtyOrdered - qtyShipped,
+          unit_price:    unitPrice,
+          subtotal,
+          tax_pct:       taxPct,
+          tax_amount:    taxAmount,
+          po_total:      poTotal,
+          lead_time_wk:  leadTime,
+          order_date:    orderDate,
+          delivery_date: deliveryDate,
+          receipt_wk:    receiptWk,
+          commit_status: commitStatus,
+          status:        String(row['Status *'] || 'Open').trim(),
+          brand:         String(row['Brand *'] || '').trim() || null,
+          notes:         String(row['Notes'] || '').trim() || null,
+          uploaded_by:   user.email,
+          uploaded_at:   new Date().toISOString(),
+          updated_at:    new Date().toISOString(),
+        }
+      })
+
+    if (!mapped.length) return NextResponse.json({ error: 'No valid rows found. Check PO Number and SKU columns.' }, { status: 400 })
+
+    // Check for unrecognized SKUs
+    const uploadedSkus = [...new Set(mapped.map(r => r.sku))]
+    const { data: validSkus } = await supabase.from('master_sku').select('sku').in('sku', uploadedSkus)
+    const validSkuSet = new Set(validSkus?.map((s: any) => s.sku) || [])
+    const invalidSkus = uploadedSkus.filter(s => !validSkuSet.has(s))
+
+    // Filter out invalid SKUs
+    const valid = mapped.filter(r => validSkuSet.has(r.sku))
+    const skipped = mapped.filter(r => !validSkuSet.has(r.sku))
+
+    if (!valid.length) {
+      return NextResponse.json({
+        error: `No valid SKUs found. Unrecognized: ${invalidSkus.join(', ')}`,
+      }, { status: 400 })
+    }
+
+    // Upsert
+    const { error: upsertErr, count } = await supabase
+      .from('purchase_orders')
+      .upsert(valid, { onConflict: 'po_number,sku', count: 'exact' })
+
+    if (upsertErr) {
+      console.error('Upsert error:', upsertErr)
+      return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      total_rows: rows.length,
+      upserted: count,
+      skipped: skipped.length,
+      invalid_skus: invalidSkus,
+    })
+
+  } catch (err: any) {
+    console.error('PO upload error:', err)
+    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 })
+  }
+}
