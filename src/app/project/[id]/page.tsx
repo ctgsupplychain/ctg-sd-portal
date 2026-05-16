@@ -75,7 +75,10 @@ export default function ProjectPage() {
     const forecast = fcstData || null
 
     const { data: supplyData } = await supabase
-      .from('supply_input').select('*').in('sku', skuData?.map((s: any) => s.sku) || [])
+  .from('purchase_orders')
+  .select('*')
+  .in('sku', skuData?.map((s: any) => s.sku) || [])
+  .eq('status', 'Open')
 
     const { data: histData } = await supabase
       .from('historical_demand').select('sku, qty')
@@ -103,9 +106,9 @@ export default function ProjectPage() {
       const commits: Record<string, number> = {}
       const uncommits: Record<string, number> = {}
       skuSupply.forEach((s: any) => {
-        if (s.status === 'Commit') commits[s.receipt_wk] = (commits[s.receipt_wk] || 0) + s.qty
-        else uncommits[s.receipt_wk] = (uncommits[s.receipt_wk] || 0) + s.qty
-      })
+  if (s.commit_status === 'Commit') commits[s.receipt_wk] = (commits[s.receipt_wk] || 0) + s.qty
+  else uncommits[s.receipt_wk] = (uncommits[s.receipt_wk] || 0) + s.qty
+})
       return computeSD({
         sku, onHand: latestStock[skuRaw.sku] || 0, weeks: wkList,
         forecast, historicalAvg: histAvg[skuRaw.sku] || 0,
