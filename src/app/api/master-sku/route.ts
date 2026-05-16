@@ -56,8 +56,11 @@ export async function POST(req: NextRequest) {
       // Build record — only include non-null/non-empty values
       const record: any = { sku }
 
-      if (brand) record.brand = brand
-      if (row['Description'] != null && String(row['Description']).trim()) record.description = String(row['Description']).trim()
+// For new SKUs only — set brand and description
+if (isNew) {
+  if (brand) record.brand = brand
+  if (row['Description'] != null && String(row['Description']).trim()) record.description = String(row['Description']).trim()
+}
       if (row['UOM'] != null && String(row['UOM']).trim()) record.uom = String(row['UOM']).trim()
       if (row['MOQ'] != null && row['MOQ'] !== '') record.moq = parseInt(row['MOQ']) || 0
       if (row['Lead Time (wks)'] != null && row['Lead Time (wks)'] !== '') record.lead_time_wk = parseInt(row['Lead Time (wks)']) || 0
