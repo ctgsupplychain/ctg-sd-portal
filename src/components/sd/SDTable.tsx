@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import clsx from 'clsx'
 import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { FLAG_DISPLAY } from '@/lib/sd-compute'
@@ -22,6 +22,23 @@ function fmtRm(n: number): string {
 
 export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
   const [selectedSku, setSelectedSku] = useState(skus[0]?.sku.sku || '')
+  const [search, setSearch] = useState('')
+
+  // Sort by description A-Z
+  const sortedSkus = useMemo(() =>
+    [...skus].sort((a, b) =>
+      (a.sku.description || '').localeCompare(b.sku.description || '')
+    ), [skus])
+
+  // Filter by search (partial match on SKU code or description)
+  const filteredSkus = useMemo(() =>
+    search.trim() === ''
+      ? sortedSkus
+      : sortedSkus.filter(s =>
+          s.sku.sku.toLowerCase().includes(search.toLowerCase()) ||
+          (s.sku.description || '').toLowerCase().includes(search.toLowerCase())
+        ), [sortedSkus, search])
+
   const current = skus.find(s => s.sku.sku === selectedSku) || skus[0]
   if (!current) return null
 
@@ -41,21 +58,36 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
   return (
     <div className="flex flex-col gap-3">
       {/* SKU selector */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm font-medium text-[#344054]">Select SKU</span>
+
+        {/* Search input */}
+        <input
+          type="text"
+          placeholder="Search SKU or description..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] w-56"
+        />
+
+        {/* Dropdown */}
         <select
           value={selectedSku}
           onChange={e => setSelectedSku(e.target.value)}
           className="text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] min-w-64"
         >
-          {[...skus].sort((a,b) => a.sku.sku.localeCompare(b.sku.sku)).map(s => (
+          {filteredSkus.length === 0 && (
+            <option disabled>No results</option>
+          )}
+          {filteredSkus.map(s => (
             <option key={s.sku.sku} value={s.sku.sku}>
-              {s.sku.sku} — {s.sku.description.slice(0, 45)}
+              {s.sku.sku} — {(s.sku.description || '').slice(0, 45)}
             </option>
           ))}
         </select>
+
         <span className="text-xs text-[#667085] bg-[#F2F4F7] px-2.5 py-1 rounded-full">
-          {current.sku.uom} · MOQ {current.sku.moq.toLocaleString()} · LT {current.sku.leadTimeWk} wks
+          {current.sku.uom || 'Unit'} · MOQ {(current.sku.moq || 0).toLocaleString()} · LT {current.sku.leadTimeWk || 0} wks
         </span>
         <span className="ml-auto text-sm font-semibold" style={{ color: flag.color }}>
           {flag.emoji} {flag.label}
@@ -100,47 +132,11 @@ export default function SDTable({ skus, weeks, currentWk }: SDTableProps) {
             </tr>
           </thead>
           <tbody>
-            {/* Forecast RM'000 */}
-            <SDRow
-              label="Forecast RM'000"
-              values={current.weeks.map(w => fmtRm(w.forecastRm))}
-              weeks={weeks}
-              currentWk={currentWk}
-              rowStyle="fcast"
-            />
-            {/* Forecast Qty */}
-            <SDRow
-              label="Forecast Qty"
-              values={current.weeks.map(w => fmt(w.forecastQty))}
-              weeks={weeks}
-              currentWk={currentWk}
-              rowStyle="qty"
-            />
-            {/* Supply Commit */}
-            <SDRow
-              label="Supply (Commit)"
-              values={current.weeks.map(w => fmt(w.supplyCommit))}
-              weeks={weeks}
-              currentWk={currentWk}
-              rowStyle="commit"
-            />
-            {/* Supply Uncommit */}
-            <SDRow
-              label="Supply (Uncommit)"
-              values={current.weeks.map(w => fmt(w.supplyUncommit))}
-              weeks={weeks}
-              currentWk={currentWk}
-              rowStyle="uncommit"
-            />
-            {/* Balance */}
-            <SDRow
-              label="Balance"
-              values={current.weeks.map(w => fmt(w.balance))}
-              weeks={weeks}
-              currentWk={currentWk}
-              rowStyle="balance"
-              balanceValues={current.weeks.map(w => w.balance)}
-            />
+            <SDRow label="Forecast RM'000" values={current.weeks.map(w => fmtRm(w.forecastRm))} weeks={weeks} currentWk={currentWk} rowStyle="fcast" />
+            <SDRow label="Forecast Qty" values={current.weeks.map(w => fmt(w.forecastQty))} weeks={weeks} currentWk={currentWk} rowStyle="qty" />
+            <SDRow label="Supply (Commit)" values={current.weeks.map(w => fmt(w.supplyCommit))} weeks={weeks} currentWk={currentWk} rowStyle="commit" />
+            <SDRow label="Supply (Uncommit)" values={current.weeks.map(w => fmt(w.supplyUncommit))} weeks={weeks} currentWk={currentWk} rowStyle="uncommit" />
+            <SDRow label="Balance" values={current.weeks.map(w => fmt(w.balance))} weeks={weeks} currentWk={currentWk} rowStyle="balance" balanceValues={current.weeks.map(w => w.balance)} />
           </tbody>
         </table>
       </div>
