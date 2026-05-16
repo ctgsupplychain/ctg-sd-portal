@@ -171,31 +171,7 @@ export default function ProjectPage() {
             <div className="flex items-center justify-center h-40 text-[#667085] text-sm">Loading S&D data...</div>
           ) : (
             <>
-              {/* SKU Selector */}
-              <div>
-                <label className="text-xs font-medium text-[#667085] mb-1.5 block">Select SKU</label>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <select
-                    value={selectedSku}
-                    onChange={e => setSelectedSku(e.target.value)}
-                    className="text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-teal-500 min-w-72"
-                  >
-                    {[...skuResults]
-                      .sort((a, b) => (a.sku.description || '').localeCompare(b.sku.description || ''))
-                      .map(s => (
-                        <option key={s.sku.sku} value={s.sku.sku}>
-                          {s.sku.sku} — {(s.sku.description || '').slice(0, 50)}
-                        </option>
-                      ))}
-                  </select>
-                  {currentSkuResult && (
-                    <span className="text-xs text-[#667085] bg-[#F2F4F7] px-2.5 py-1 rounded-full">
-                      {currentSkuResult.sku.uom || 'Unit'} · MOQ {(currentSkuResult.sku.moq || 0).toLocaleString()} · LT {currentSkuResult.sku.leadTimeWk || 0} wks
-                    </span>
-                  )}
-                </div>
-              </div>
-
+              
               {/* 4 Info Cards */}
               {currentSkuResult && flag && (
                 <div className="grid grid-cols-4 gap-4">
