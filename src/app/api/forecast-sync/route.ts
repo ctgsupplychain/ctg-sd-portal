@@ -103,11 +103,15 @@ function getPreviousWk(): string {
   return `W${weekNum - 1}/${now.getFullYear()}`
 }
 
+function safeDate(ts: string): number {
+  try { const d = new Date(ts); return isNaN(d.getTime()) ? 0 : d.getTime() } catch { return 0 }
+}
+
 function getLatestRow(rows: Record<string, string>[], project: string, targetWk: string) {
   const wkRows = rows.filter(r => r['Project']?.trim() === project && r['Week']?.trim() === targetWk)
-  if (wkRows.length) return wkRows.sort((a, b) => new Date(b['Timestamp']).getTime() - new Date(a['Timestamp']).getTime())[0]
+  if (wkRows.length) return wkRows.sort((a, b) => safeDate(b['Timestamp']) - safeDate(a['Timestamp']))[0]
   const all = rows.filter(r => r['Project']?.trim() === project)
-  return all.length ? all.sort((a, b) => new Date(b['Timestamp']).getTime() - new Date(a['Timestamp']).getTime())[0] : null
+  return all.length ? all.sort((a, b) => safeDate(b['Timestamp']) - safeDate(a['Timestamp']))[0] : null
 }
 
 function applyCarryForward(monthly: Record<string, number>): Record<string, number> {
@@ -170,7 +174,7 @@ export async function POST(req: NextRequest) {
         submission_wk: wkStr,
         year,
         ...carried,
-        submitted_at: row['Timestamp'] ? new Date(row['Timestamp']).toISOString() : new Date().toISOString(),
+        submitted_at: safeDate(row['Timestamp']) > 0 ? new Date(row['Timestamp']).toISOString() : new Date().toISOString(),
       }, { onConflict: 'brand,submission_wk,year' })
 
       results.push({
