@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { Upload, CheckCircle, AlertTriangle, ChevronDown, ChevronUp, BarChart2 } from 'lucide-react'
+import BackToSD from '@/components/layout/BackToSD'
 
 type Channel = 'B2B' | 'B2C'
 
@@ -193,12 +194,14 @@ export default function SalesHistoryUploadPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
+      <div className="flex items-center gap-3 mb-6">
+        <BackToSD />
+        <div className="w-px h-4 bg-gray-200" />
+        <h1 className="text-sm font-semibold text-gray-900">Sales History Upload</h1>
+      </div>
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-1">Sales History Upload</h1>
-        <p className="text-sm text-gray-500">
-          Upload B2B and/or B2C WMS order reports. Data is rolled up to weekly demand,
-          upserted into the sales history table, and demand forecasts are regenerated automatically.
-        </p>
+        <p className="text-sm text-gray-500">Upload B2B and/or B2C WMS order reports. Data is rolled up to weekly demand,
+          upserted into the sales history table, and demand forecasts are regenerated automatically.</p>
       </div>
 
       {/* Upload mode notice */}

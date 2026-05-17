@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, PlusCircle, RefreshCw } from 'lucide-react'
+import BackToSD from '@/components/layout/BackToSD'
 
 interface UploadResult {
   success: boolean
@@ -74,7 +75,11 @@ export default function MasterSkuPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-1">Master SKU Upload</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <BackToSD />
+        <div className="w-px h-4 bg-gray-200" />
+        <h1 className="text-sm font-semibold text-gray-900">Master SKU Upload</h1>
+      </div>
       <p className="text-sm text-gray-500 mb-8">
         Upload to add new SKUs or update existing ones. Upserts on SKU code — blank fields keep existing values.
       </p>

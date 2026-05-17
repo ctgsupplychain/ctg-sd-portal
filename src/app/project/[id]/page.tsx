@@ -24,7 +24,10 @@ export default function ProjectPage() {
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [selectedSku, setSelectedSku] = useState<string>('')
 
-  useEffect(() => { loadAll() }, [brand])
+  useEffect(() => {
+    sessionStorage.setItem('ctg_last_brand', brand)
+    loadAll()
+  }, [brand])
 
   async function loadAll() {
     setLoading(true)
