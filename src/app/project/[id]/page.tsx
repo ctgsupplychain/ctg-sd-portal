@@ -4,7 +4,16 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/layout/Sidebar'
 import SDTable from '@/components/sd/SDTable'
-import ForecastChart from '@/components/sd/ForecastChart'
+import dynamic from 'next/dynamic'
+
+const ForecastChart = dynamic(
+  () => import('@/components/sd/ForecastChart'),
+  { ssr: false, loading: () => (
+    <div className="bg-white rounded-xl border border-[#EAECF0] p-5 mt-4 h-32 flex items-center justify-center text-sm text-[#98A2B3]">
+      Loading forecast chart...
+    </div>
+  )}
+)
 import { computeSD, FLAG_DISPLAY } from '@/lib/sd-compute'
 import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { loadDemandForecast } from '@/lib/forecasting/forecast-lookup'
