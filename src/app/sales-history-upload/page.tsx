@@ -79,9 +79,27 @@ export default function SalesHistoryUploadPage() {
     }
   }, [])
 
+  async function compressToXlsx(file: File): Promise<File> {
+    // Re-encode XLS as XLSX (zip-compressed) client-side.
+    // A 5MB XLS typically shrinks to <1MB as XLSX.
+    // Only needed for .xls — .xlsx files are already compressed.
+    if (file.name.toLowerCase().endsWith('.xlsx')) return file
+
+    const XLSX = await import('xlsx')
+    const buffer = await file.arrayBuffer()
+    const wb = XLSX.read(buffer, { type: 'array' })
+    const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+    const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const newName = file.name.replace(/\.xls$/i, '.xlsx')
+    return new File([blob], newName, { type: blob.type })
+  }
+
   async function uploadFile(file: File, channel: Channel, token: string): Promise<UploadResult> {
+    // Compress XLS → XLSX client-side to stay under Next.js 4.5MB route limit
+    const compressed = await compressToXlsx(file)
+
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', compressed)
     formData.append('channel', channel)
 
     const res = await fetch('/api/sales-history-upload', {
@@ -90,9 +108,13 @@ export default function SalesHistoryUploadPage() {
       body: formData,
     })
 
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error ?? `${channel} upload failed`)
-    return json
+    if (!res.ok) {
+      let errMsg = `${channel} upload failed (${res.status})`
+      try { const j = await res.json(); errMsg = j.error ?? errMsg } catch {}
+      throw new Error(errMsg)
+    }
+
+    return res.json()
   }
 
   const handleUpload = async () => {

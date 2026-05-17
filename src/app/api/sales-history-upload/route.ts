@@ -4,6 +4,10 @@
 // ETL: parse → weekly rollup → upsert sales_history → generate forecast
 // ============================================================
 
+// Raise body size limit — B2C files can exceed the 4.5MB default
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseOrderReport, Channel } from '@/lib/forecasting/parse-order-report'
