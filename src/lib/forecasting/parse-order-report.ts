@@ -89,7 +89,7 @@ export function parseOrderReport(
     }
 
     // SKU resolution
-    const rawSku = String(row['Seller Sku'] ?? '').trim()
+    const rawSku = String(row['Seller Sku'] ?? '').trim().toUpperCase()
     if (!rawSku) { skippedLineItems++; continue }
     const masterSku = wmsToMasterSku?.get(rawSku) ?? rawSku
 

@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const mapped = rows
       .filter(row => row['PO Number *'] && row['SKU *'])
       .map(row => {
-        const sku = String(row['SKU *']).trim()
+        const sku = String(row['SKU *']).trim().toUpperCase()
         const deliveryDate = parseDate(row['Delivery Date'])
         const orderDate = parseDate(row['Order Date *'])
         const leadTime = Number(row['Lead Time (wks)']) || leadTimeMap[sku] || 0
