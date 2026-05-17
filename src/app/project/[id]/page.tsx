@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/layout/Sidebar'
 import SDTable from '@/components/sd/SDTable'
+import ForecastChart from '@/components/sd/ForecastChart'
 import { computeSD, FLAG_DISPLAY } from '@/lib/sd-compute'
 import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { loadDemandForecast } from '@/lib/forecasting/forecast-lookup'
@@ -243,6 +244,15 @@ export default function ProjectPage() {
                   ? <SDTable skus={skuResults} weeks={weeks} currentWk={CURRENT_WK} selectedSku={selectedSku} onSkuChange={setSelectedSku} />
                   : <div className="text-sm text-[#667085] text-center py-8">No SKU data found for {brand}</div>}
               </div>
+
+              {/* Demand Forecast Chart */}
+              {skuResults.length > 0 && (
+                <ForecastChart
+                  selectedSku={selectedSku}
+                  skuResult={skuResults.find(s => s.sku.sku === selectedSku) ?? null}
+                  brand={brand}
+                />
+              )}
             </>
           )}
         </div>
