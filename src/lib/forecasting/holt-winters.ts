@@ -27,6 +27,7 @@ export interface ForecastResult {
   sku: string
   model: ForecastModel
   historyWeeks: number
+  cappedWeeks: number       // number of outlier weeks replaced before model fitting
   points: ForecastPoint[]
   mape?: number           // Mean Absolute Percentage Error on last-4-week holdout
 }
@@ -177,6 +178,41 @@ function confidenceBounds(
   }
 }
 
+// ── Outlier Capping ─────────────────────────────────────────
+
+/**
+ * Cap outlier weeks at mean + sigmaThreshold × stdDev using a
+ * rolling 12-week trailing window per point.
+ *
+ * Uses trailing window (not global mean) so a growing SKU's recent
+ * high weeks aren't incorrectly flagged against the full-history mean.
+ * Capped values are replaced with the trailing mean so trend signal
+ * is preserved without the spike distorting the HW level parameter.
+ */
+export function capOutliers(
+  series: number[],
+  sigmaThreshold = 3,
+  windowSize = 12
+): { capped: number[]; cappedIndices: number[] } {
+  const result = [...series]
+  const cappedIndices: number[] = []
+
+  for (let i = windowSize; i < series.length; i++) {
+    const window = series.slice(i - windowSize, i)
+    const mean = window.reduce((a, b) => a + b, 0) / window.length
+    const variance = window.reduce((s, v) => s + (v - mean) ** 2, 0) / window.length
+    const stdDev = Math.sqrt(variance)
+    const ceiling = mean + sigmaThreshold * stdDev
+
+    if (series[i] > ceiling && ceiling > 0) {
+      result[i] = Math.round(mean)
+      cappedIndices.push(i)
+    }
+  }
+
+  return { capped: result, cappedIndices }
+}
+
 // ── Dense Series Builder ────────────────────────────────────
 
 /** Fill gaps between history points with 0 to produce a continuous series */
@@ -223,7 +259,8 @@ export function generateForecast(
   const sorted = [...history].sort(
     (a, b) => a.isoYear * 100 + a.isoWeek - (b.isoYear * 100 + b.isoWeek)
   )
-  const series = buildDenseSeries(sorted)
+  const rawSeries = buildDenseSeries(sorted)
+  const { capped: series, cappedIndices } = capOutliers(rawSeries)
   const n = series.length
 
   let model: ForecastModel
@@ -279,5 +316,5 @@ export function generateForecast(
     }
   }
 
-  return { sku, model, historyWeeks: n, points, mape }
+  return { sku, model, historyWeeks: n, cappedWeeks: cappedIndices.length, points, mape }
 }

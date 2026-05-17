@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
       forecastSummary[sku] = {
         model: result.model,
         historyWeeks: result.historyWeeks,
+        cappedWeeks: result.cappedWeeks,
         mape: result.mape,
       }
 

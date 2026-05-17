@@ -95,3 +95,41 @@ create policy "Supply chain write demand_forecast"
       where id = auth.uid() and role in ('admin', 'supply_chain')
     )
   );
+
+-- ============================================================
+-- SKU WMS MAPPING
+-- Maps WMS Seller Sku codes → master_sku when they differ
+-- e.g. 'SDSDCA05' → 'SDSDCA05S', 'SDSDPM01' → 'SDSDPM01S'
+-- Maintained manually; consulted during every upload parse
+-- ============================================================
+create table if not exists public.sku_wms_mapping (
+  id          bigserial primary key,
+  wms_sku     text not null unique,
+  master_sku  text not null references public.master_sku(sku),
+  brand       text,
+  note        text,
+  created_at  timestamptz default now()
+);
+
+-- Seed known SkinDae mappings
+insert into public.sku_wms_mapping (wms_sku, master_sku, brand, note) values
+  ('SDSDCA05',  'SDSDCA05S',  'SkinDae', 'WMS omits trailing S'),
+  ('SDSDPM01',  'SDSDPM01S',  'SkinDae', 'WMS omits trailing S'),
+  ('SDSDSB01S', 'SDSDSH01S',  'SkinDae', 'WMS uses SB prefix, master uses SH')
+on conflict (wms_sku) do nothing;
+
+alter table public.sku_wms_mapping enable row level security;
+
+create policy "Authenticated read sku_wms_mapping"
+  on public.sku_wms_mapping for select
+  to authenticated using (true);
+
+create policy "Supply chain write sku_wms_mapping"
+  on public.sku_wms_mapping for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role in ('admin', 'supply_chain')
+    )
+  );
