@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     // ── Regenerate demand forecast for affected SKUs ───────
     const affectedSkus = [...new Set(validRows.map(r => r.sku))]
     const forecastSummary: Record<string, {
-      model: string; historyWeeks: number; mape?: number
+      model: string; historyWeeks: number; cappedWeeks: number; mape?: number
     }> = {}
 
     for (const sku of affectedSkus) {
