@@ -14,10 +14,10 @@ interface HistoryPoint { wk: string; qty: number; date: string }
 interface ForecastPoint { wk: string; qty: number; lower: number; upper: number; date: string }
 
 export default function ForecastChart({ selectedSku, skuResult }: ForecastChartProps) {
-  const canvasRef  = useRef<HTMLCanvasElement>(null)
-  const chartRef   = useRef<any>(null)
-  const chartLib   = useRef<any>(null)   // useRef — never put class constructors in useState
-  const supabase   = createClient()
+  const supabase  = createClient()
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const chartRef  = useRef<any>(null)
+  const chartLib  = useRef<any>(null)
 
   const [history,  setHistory]  = useState<HistoryPoint[]>([])
   const [forecast, setForecast] = useState<ForecastPoint[]>([])

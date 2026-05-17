@@ -285,7 +285,7 @@ export default function SalesHistoryUploadPage() {
   const totalWeeklyRows = results.reduce((sum, r) => sum + r.salesHistory.weeklyRowsProcessed, 0)
   const allUnknownSkus = [...new Set(results.flatMap(r => r.warnings.unknownSkus))]
   const allSkippedStatuses = results.reduce((acc, r) => {
-    Object.entries(r.parseStats.skippedStatuses).forEach(([k, v]) => {
+    Object.entries(r.parseStats.skippedStatuses ?? {}).forEach(([k, v]) => {
       acc[k] = (acc[k] ?? 0) + v
     })
     return acc
