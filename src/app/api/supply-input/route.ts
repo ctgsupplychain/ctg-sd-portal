@@ -27,12 +27,15 @@ function parseDate(val: any): string | null {
   return null
 }
 
-// Convert delivery_date to WK label e.g. "WK22"
+// Convert delivery_date to WK label matching portal's ISO week_calendar e.g. "WK22"
 function dateToWkLabel(dateStr: string): string {
-  const d = new Date(dateStr)
-  const startOfYear = new Date(d.getFullYear(), 0, 1)
-  const weekNum = Math.ceil(((d.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
-  return `WK${weekNum}`
+  const d = new Date(dateStr + 'T00:00:00Z')
+  // ISO week calculation: Thursday of the week determines the year
+  const dayOfWeek = d.getUTCDay() || 7          // Sun=7, Mon=1
+  d.setUTCDate(d.getUTCDate() + 4 - dayOfWeek)  // shift to Thursday
+  const jan1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const isoWeek = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + 1) / 7)
+  return `WK${String(isoWeek).padStart(2, '0')}`
 }
 
 // Add weeks to a date string
