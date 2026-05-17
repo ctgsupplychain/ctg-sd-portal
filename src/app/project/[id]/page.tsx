@@ -6,6 +6,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import SDTable from '@/components/sd/SDTable'
 import { computeSD, FLAG_DISPLAY } from '@/lib/sd-compute'
 import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
+import { loadDemandForecast } from '@/lib/forecasting/forecast-lookup'
 import { RefreshCw, Download } from 'lucide-react'
 
 const CURRENT_WK = process.env.NEXT_PUBLIC_CURRENT_WEEK || 'WK20'
@@ -95,6 +96,10 @@ export default function ProjectPage() {
       histAvg[sku] = qtys.reduce((a, b) => a + b, 0) / qtys.length
     })
 
+    // Load statistical demand forecast (Tier 2 fallback for ASP=0 SKUs)
+    const skuList = skuData?.map((s: any) => s.sku) || []
+    const demandForecastMap = await loadDemandForecast(skuList)
+
     const results: SkuSdResult[] = (skuData || []).map((skuRaw: any) => {
       const sku = {
         sku: skuRaw.sku, description: skuRaw.description, brand: skuRaw.brand,
@@ -106,12 +111,13 @@ export default function ProjectPage() {
       const commits: Record<string, number> = {}
       const uncommits: Record<string, number> = {}
       skuSupply.forEach((s: any) => {
-  if (s.commit_status === 'Commit') commits[s.receipt_wk] = (commits[s.receipt_wk] || 0) + s.qty
-  else uncommits[s.receipt_wk] = (uncommits[s.receipt_wk] || 0) + s.qty
-})
+        if (s.commit_status === 'Commit') commits[s.receipt_wk] = (commits[s.receipt_wk] || 0) + s.qty
+        else uncommits[s.receipt_wk] = (uncommits[s.receipt_wk] || 0) + s.qty
+      })
       return computeSD({
         sku, onHand: latestStock[skuRaw.sku] || 0, weeks: wkList,
         forecast, historicalAvg: histAvg[skuRaw.sku] || 0,
+        demandForecast: demandForecastMap.get(skuRaw.sku) ?? null,
         supplyCommits: commits, supplyUncommits: uncommits,
         currentWk: CURRENT_WK, thresholdOrderNow: 4, thresholdMonitor: 8,
       })

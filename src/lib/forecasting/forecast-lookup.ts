@@ -1,28 +1,26 @@
 // ============================================================
 // Demand Forecast Lookup
-// Provides getForecastFromDB() to replace historicalAvg fallback
-// in sd-compute.ts for ASP=0 SKUs
+// Provides loadDemandForecast() for the S&D page to read
+// statistical forecasts as Tier 2 fallback in computeSD()
+// Uses browser client — safe for 'use client' components
 // ============================================================
 
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createClient } from '@/lib/supabase'
 
 /**
  * Load the latest demand forecast for a set of SKUs, keyed by wk_label.
  * Returns: Map<sku, Map<wkLabel, forecastQty>>
  *
- * Usage in sd-compute pipeline (server-side):
+ * Usage in project page:
  *   const fcMap = await loadDemandForecast(['SDDLSC030', 'SDSDPD01S'])
- *   const qty = fcMap.get(sku)?.get(wkLabel) ?? historicalAvg
+ *   // passed into computeSD() as demandForecast param
  */
 export async function loadDemandForecast(
   skus: string[]
 ): Promise<Map<string, Map<string, number>>> {
   if (skus.length === 0) return new Map()
+
+  const supabase = createClient()
 
   const { data, error } = await supabase
     .from('demand_forecast')
@@ -41,22 +39,4 @@ export async function loadDemandForecast(
   }
 
   return result
-}
-
-/**
- * Get forecast qty for a single SKU + week label.
- * Convenience wrapper — use loadDemandForecast() for batch (avoids N+1).
- */
-export async function getForecastQtyFromDB(
-  sku: string,
-  wkLabel: string
-): Promise<number | null> {
-  const { data } = await supabase
-    .from('demand_forecast')
-    .select('forecast_qty')
-    .eq('sku', sku)
-    .eq('wk_label', wkLabel)
-    .single()
-
-  return data?.forecast_qty ?? null
 }
