@@ -79,33 +79,110 @@ export default function SalesHistoryUploadPage() {
     }
   }, [])
 
-  async function compressToXlsx(file: File): Promise<File> {
-    // Re-encode XLS as XLSX (zip-compressed) client-side.
-    // A 5MB XLS typically shrinks to <1MB as XLSX.
-    // Only needed for .xls — .xlsx files are already compressed.
-    if (file.name.toLowerCase().endsWith('.xlsx')) return file
-
+  // Parse XLS/XLSX in the browser and roll up to weekly totals.
+  // Returns a compact JSON payload (few KB) instead of posting the raw 5MB file.
+  async function parseFileToWeeklyRows(file: File, channel: Channel): Promise<any[]> {
     const XLSX = await import('xlsx')
     const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array' })
-    const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
-    const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-    const newName = file.name.replace(/\.xls$/i, '.xlsx')
-    return new File([blob], newName, { type: blob.type })
+    const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
+    const sheet = wb.Sheets[wb.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: null })
+
+    const VALID_STATUSES = new Set([
+      'delivered', 'dispatched', 'manifest_created', 'awaiting_dispatch'
+    ])
+    const WMS_TO_MASTER: Record<string, string> = {
+      'SDSDCA05': 'SDSDCA05S',
+      'SDSDPM01': 'SDSDPM01S',
+      'SDSDSB01S': 'SDSDSH01S',
+    }
+
+    function parseWmsDate(raw: any): Date | null {
+      if (!raw) return null
+      try {
+        const s = String(raw).replace(',', '').trim()
+        const datePart = s.split(' ')[0]
+        const parts = datePart.split('/')
+        if (parts.length === 3) {
+          const [dd, mm, yyyy] = parts
+          return new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)))
+        }
+      } catch {}
+      return null
+    }
+
+    function isoWeekFromDate(d: Date): { isoYear: number; isoWeek: number; weekStart: string } {
+      const thu = new Date(d)
+      thu.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7))
+      const jan1 = new Date(Date.UTC(thu.getUTCFullYear(), 0, 1))
+      const isoWeek = Math.ceil(((thu.getTime() - jan1.getTime()) / 86400000 + 1) / 7)
+      const isoYear = thu.getUTCFullYear()
+      // Monday of that week
+      const dow = d.getUTCDay() || 7
+      const monday = new Date(d)
+      monday.setUTCDate(d.getUTCDate() - (dow - 1))
+      const weekStart = monday.toISOString().split('T')[0]
+      return { isoYear, isoWeek, weekStart }
+    }
+
+    const weekMap = new Map<string, { brand: string; company: string; sku: string; channel: Channel; isoYear: number; isoWeek: number; weekStart: string; qty: number; orders: Set<string> }>()
+
+    for (const row of rows) {
+      const status = String(row['Order Status'] ?? '').trim().toLowerCase()
+      if (!VALID_STATUSES.has(status)) continue
+
+      const rawSku = String(row['Seller Sku'] ?? '').trim().toUpperCase()
+      if (!rawSku) continue
+      const sku = WMS_TO_MASTER[rawSku] ?? rawSku
+
+      const qty = Number(row['Ordered Quantity'] ?? 0)
+      if (qty <= 0) continue
+
+      const d = parseWmsDate(row['Order Date'])
+      if (!d) continue
+
+      const { isoYear, isoWeek, weekStart } = isoWeekFromDate(d)
+      const company = String(row['Company'] ?? '').trim() || 'UNKNOWN'
+      const brand = company.toUpperCase() === 'SKINDAE' ? 'SkinDae' : company
+      const orderNum = String(row['Order Number'] ?? '').trim()
+      const key = `${sku}|${isoYear}|${isoWeek}`
+
+      const existing = weekMap.get(key)
+      if (existing) {
+        existing.qty += qty
+        if (orderNum) existing.orders.add(orderNum)
+      } else {
+        const orders = new Set<string>()
+        if (orderNum) orders.add(orderNum)
+        weekMap.set(key, { brand, company, sku, channel, isoYear, isoWeek, weekStart, qty, orders })
+      }
+    }
+
+    return Array.from(weekMap.values()).map(r => ({
+      brand: r.brand,
+      company: r.company,
+      sku: r.sku,
+      channel: r.channel,
+      isoYear: r.isoYear,
+      isoWeek: r.isoWeek,
+      weekStart: r.weekStart,
+      qty: r.qty,
+      orderCount: r.orders.size,
+    }))
   }
 
   async function uploadFile(file: File, channel: Channel, token: string): Promise<UploadResult> {
-    // Compress XLS → XLSX client-side to stay under Next.js 4.5MB route limit
-    const compressed = await compressToXlsx(file)
-
-    const formData = new FormData()
-    formData.append('file', compressed)
-    formData.append('channel', channel)
+    // Parse file client-side → POST compact JSON (few KB vs 5MB raw file)
+    // This bypasses Vercel's hard 4.5MB route handler body limit
+    const weeklyRows = await parseFileToWeeklyRows(file, channel)
 
     const res = await fetch('/api/sales-history-upload', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ channel, rows: weeklyRows, filename: file.name }),
     })
 
     if (!res.ok) {
