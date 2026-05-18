@@ -1,20 +1,20 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, PlusCircle, RefreshCw } from 'lucide-react'
+import { Upload, Search, RefreshCw } from 'lucide-react'
 import BackToSD from '@/components/layout/BackToSD'
 
-interface UploadResult {
-  success: boolean
-  total_rows: number
-  inserted: number
-  updated: number
-  skipped: number
-  inserted_skus: string[]
-  updated_skus: string[]
-  skipped_details: string[]
+interface MasterSku {
+  sku: string
+  description: string
+  brand: string
+  avg_selling_price: number
+  moq: number
+  lead_time_wk: number
+  status: string
+  uom?: string
 }
 
 export default function MasterSkuPage() {
@@ -23,164 +23,174 @@ export default function MasterSkuPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
   const router = useRouter()
-  const [file, setFile] = useState<File | null>(null)
-  const [dragging, setDragging] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<UploadResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [lastUploaded, setLastUploaded] = useState<string | null>(null)
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setDragging(false)
-    const dropped = e.dataTransfer.files[0]
-    if (dropped?.name.endsWith('.xlsx')) {
-      setFile(dropped); setResult(null); setError(null)
-    } else {
-      setError('Please upload an .xlsx file.')
-    }
-  }, [])
+  const [skus,    setSkus]    = useState<MasterSku[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState<string | null>(null)
+  const [search,  setSearch]  = useState('')
+  const [brand,   setBrand]   = useState('All')
+  const [status,  setStatus]  = useState('All')
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    if (selected) { setFile(selected); setResult(null); setError(null) }
+  useEffect(() => { loadSkus() }, [])
+
+  async function loadSkus() {
+    setLoading(true); setError(null)
+    const { data, error: err } = await supabase
+      .from('master_sku')
+      .select('sku, description, brand, avg_selling_price, moq, lead_time_wk, status, uom')
+      .order('brand').order('sku')
+    if (err) { setError(err.message); setLoading(false); return }
+    setSkus(data ?? [])
+    setLoading(false)
   }
 
-  const handleUpload = async () => {
-    if (!file) return
-    setLoading(true); setError(null); setResult(null)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+  const brands   = useMemo(() => ['All', ...Array.from(new Set(skus.map(s => s.brand)))], [skus])
+  const statuses = ['All', 'Active', 'Inactive']
 
-      const formData = new FormData()
-      formData.append('file', file)
+  const filtered = useMemo(() => skus.filter(s => {
+    const q = search.toLowerCase()
+    return (
+      (!search || s.sku.toLowerCase().includes(q) || (s.description ?? '').toLowerCase().includes(q)) &&
+      (brand  === 'All' || s.brand  === brand) &&
+      (status === 'All' || s.status === status)
+    )
+  }), [skus, search, brand, status])
 
-      const res = await fetch('/api/master-sku', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body: formData,
-      })
-
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Upload failed')
-      setResult(json)
-      setLastUploaded(new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }))
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const totalActive = skus.filter(s => s.status === 'Active').length
+  const withAsp     = skus.filter(s => Number(s.avg_selling_price) > 0).length
+  const withoutAsp  = skus.filter(s => Number(s.avg_selling_price) === 0).length
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
-      <div className="flex items-center gap-3 mb-6">
-        <BackToSD />
-        <div className="w-px h-4 bg-gray-200" />
-        <h1 className="text-sm font-semibold text-gray-900">Master SKU Upload</h1>
-      </div>
-      <p className="text-sm text-gray-500 mb-8">
-        Upload to add new SKUs or update existing ones. Upserts on SKU code — blank fields keep existing values.
-      </p>
+    <div className="max-w-5xl mx-auto px-6 py-10">
 
-      {/* Download template */}
-      <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-teal-800">Need the template?</p>
-          <p className="text-xs text-teal-600 mt-0.5">Download the Master SKU Upload Template</p>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <BackToSD />
+          <div className="w-px h-4 bg-gray-200" />
+          <h1 className="text-sm font-semibold text-gray-900">Master SKU</h1>
         </div>
-        <a
-          href="/templates/CTG_Master_SKU_Template.xlsx"
-          className="text-xs font-medium text-teal-700 border border-teal-300 px-3 py-1.5 rounded-lg hover:bg-teal-100 transition-colors flex items-center gap-1.5"
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadSkus}
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 px-3 py-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw size={12} /> Refresh
+          </button>
+          <button
+            onClick={() => router.push('/master-sku/upload')}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-white px-3 py-1.5 bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors"
+          >
+            <Upload size={12} /> Update / Upload SKUs
+          </button>
+        </div>
+      </div>
+
+      {/* Summary metrics */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        {[
+          { label: 'Total SKUs', value: skus.length,  sub: 'all brands' },
+          { label: 'Active',     value: totalActive,  sub: `${skus.length - totalActive} inactive` },
+          { label: 'With ASP',   value: withAsp,      sub: 'GSheet forecast tier' },
+          { label: 'No ASP',     value: withoutAsp,   sub: 'Statistical model tier' },
+        ].map(m => (
+          <div key={m.label} className="bg-gray-50 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">{m.label}</p>
+            <p className="text-xl font-semibold text-gray-900">{m.value}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">{m.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter bar — all in one row */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="relative flex-1">
+          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search SKU or description..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-teal-400"
+          />
+        </div>
+        <select
+          value={brand}
+          onChange={e => setBrand(e.target.value)}
+          className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-gray-600 focus:outline-none focus:border-teal-400"
         >
-          <FileSpreadsheet size={13} /> Download Template
-        </a>
+          {brands.map(b => <option key={b}>{b}</option>)}
+        </select>
+        <select
+          value={status}
+          onChange={e => setStatus(e.target.value)}
+          className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-gray-600 focus:outline-none focus:border-teal-400"
+        >
+          {statuses.map(s => <option key={s}>{s}</option>)}
+        </select>
+        <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} SKUs</span>
       </div>
 
-      {lastUploaded && <p className="text-xs text-gray-400 mb-4">Last uploaded: {lastUploaded}</p>}
-
-      {/* Drop zone */}
-      <div
-        onDragOver={e => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => document.getElementById('sku-file-input')?.click()}
-        className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
-          dragging ? 'border-teal-500 bg-teal-50' : 'border-gray-300 bg-gray-50 hover:border-teal-400'
-        }`}
-      >
-        <input id="sku-file-input" type="file" accept=".xlsx" className="hidden" onChange={handleFileChange} />
-        {file ? (
-          <div>
-            <FileSpreadsheet size={24} className="mx-auto mb-2 text-teal-600" />
-            <p className="text-sm font-medium text-teal-700">{file.name}</p>
-            <p className="text-xs text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB</p>
-          </div>
-        ) : (
-          <div>
-            <Upload size={24} className="mx-auto mb-2 text-gray-400" />
-            <p className="text-sm text-gray-500">Drag & drop your Master SKU .xlsx file here</p>
-            <p className="text-xs text-gray-400 mt-1">or click to browse</p>
-          </div>
-        )}
-      </div>
-
-      <button
-        onClick={handleUpload}
-        disabled={!file || loading}
-        className="mt-5 w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
-      >
-        {loading ? 'Processing...' : 'Upload & Save'}
-      </button>
-
-      {error && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex gap-2">
-          <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
-      )}
-
-      {result && (
-        <div className="mt-4 space-y-3">
-          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-green-600" />
-              <p className="text-sm font-medium text-green-800">Upload successful</p>
-            </div>
-            <div className="text-sm text-green-700 space-y-1">
-              <p>Total rows: <span className="font-medium">{result.total_rows}</span></p>
-              <p className="flex items-center gap-1.5">
-                <PlusCircle size={13} className="text-green-600" />
-                New SKUs inserted: <span className="font-medium">{result.inserted}</span>
-              </p>
-              <p className="flex items-center gap-1.5">
-                <RefreshCw size={13} className="text-green-600" />
-                Existing SKUs updated: <span className="font-medium">{result.updated}</span>
-              </p>
-              {result.skipped > 0 && (
-                <p className="text-yellow-700">Skipped: <span className="font-medium">{result.skipped}</span></p>
+      {/* Table */}
+      {error ? (
+        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</div>
+      ) : loading ? (
+        <div className="text-sm text-gray-400 text-center py-16">Loading...</div>
+      ) : (
+        <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                {['SKU', 'Brand', 'ASP (RM)', 'MOQ', 'Lead time', 'Forecast tier', 'Status'].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wide text-[10px] ${i === 0 ? 'text-left' : 'text-right'}`}
+                  >{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((s) => {
+                const asp  = Number(s.avg_selling_price)
+                const tier = asp > 0 ? 'GSheet' : 'Statistical'
+                return (
+                  <tr key={s.sku} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2.5">
+                      <span className="font-mono text-[11px] text-gray-700">{s.sku}</span>
+                      <p className="text-[11px] text-gray-400 mt-0.5 leading-tight max-w-[240px]">{s.description}</p>
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-xs text-gray-600">{s.brand}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-xs">
+                      {asp > 0 ? <span className="text-gray-800">{asp.toFixed(2)}</span> : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-xs text-gray-600">
+                      {s.moq > 0 ? s.moq.toLocaleString() : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-xs text-gray-600">{s.lead_time_wk} wk</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        tier === 'GSheet' ? 'bg-teal-50 text-teal-700' : 'bg-gray-100 text-gray-500'
+                      }`}>{tier}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        s.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'
+                      }`}>{s.status}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-xs text-gray-400">No SKUs match your filters</td></tr>
               )}
-            </div>
-          </div>
-
-          {result.inserted_skus?.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
-              <p className="text-xs font-medium text-blue-800 mb-1">New SKUs added:</p>
-              <p className="text-xs text-blue-700">{result.inserted_skus.join(', ')}</p>
-            </div>
-          )}
-
-          {result.skipped_details?.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
-              <p className="text-xs font-medium text-yellow-800 mb-1">Skipped:</p>
-              <ul className="text-xs text-yellow-700 space-y-0.5">
-                {result.skipped_details.map((s, i) => <li key={i}>• {s}</li>)}
-              </ul>
-            </div>
-          )}
+            </tbody>
+          </table>
         </div>
       )}
+
+      <p className="text-[11px] text-gray-400 mt-3">
+        Live from Supabase · Refresh to reload · "Update / Upload SKUs" to add or modify records
+      </p>
     </div>
   )
 }

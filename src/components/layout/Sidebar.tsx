@@ -109,7 +109,7 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
     icon={<Database size={15} />}
     label="Master SKU"
     href="/master-sku"
-    active={pathname === '/master-sku'}
+    active={pathname.startsWith('/master-sku')}
     onClick={() => router.push('/master-sku')}
   />
 )}
