@@ -178,39 +178,60 @@ function confidenceBounds(
   }
 }
 
-// ── Outlier Capping ─────────────────────────────────────────
+// ── Channel-aware Outlier Capping ──────────────────────────
 
 /**
- * Cap outlier weeks at mean + sigmaThreshold × stdDev using a
- * rolling 12-week trailing window per point.
+ * Cap B2B outlier weeks before combining with B2C.
  *
- * Uses trailing window (not global mean) so a growing SKU's recent
- * high weeks aren't incorrectly flagged against the full-history mean.
- * Capped values are replaced with the trailing mean so trend signal
- * is preserved without the spike distorting the HW level parameter.
+ * Rationale: B2B spikes are typically event/campaign stock-outs where
+ * the project owner takes a large bulk quantity to an event. These are
+ * not representative of recurring demand. B2C is the true demand signal
+ * and is never capped.
+ *
+ * Method: for each B2B week, if qty > trailing 12-week mean + 2σ,
+ * replace with the trailing mean. Applied before B2B+B2C are combined.
+ *
+ * @param b2bSeries  Weekly B2B quantities, sorted ascending by week
+ * @param windowSize Trailing window for mean/std calculation (default 12)
+ * @returns Capped B2B series + indices of weeks that were capped
  */
-export function capOutliers(
-  series: number[],
-  sigmaThreshold = 3,
+export function capB2BOutliers(
+  b2bSeries: number[],
   windowSize = 12
 ): { capped: number[]; cappedIndices: number[] } {
-  const result = [...series]
+  const result = [...b2bSeries]
   const cappedIndices: number[] = []
 
-  for (let i = windowSize; i < series.length; i++) {
-    const window = series.slice(i - windowSize, i)
+  for (let i = windowSize; i < b2bSeries.length; i++) {
+    const window = b2bSeries.slice(i - windowSize, i)
     const mean = window.reduce((a, b) => a + b, 0) / window.length
     const variance = window.reduce((s, v) => s + (v - mean) ** 2, 0) / window.length
     const stdDev = Math.sqrt(variance)
-    const ceiling = mean + sigmaThreshold * stdDev
+    const ceiling = mean + 2 * stdDev
 
-    if (series[i] > ceiling && ceiling > 0) {
+    if (b2bSeries[i] > ceiling && ceiling > 0) {
       result[i] = Math.round(mean)
       cappedIndices.push(i)
     }
   }
 
   return { capped: result, cappedIndices }
+}
+
+/**
+ * Combine B2B and B2C weekly series into a single demand series.
+ * B2B outliers are capped first; B2C is used as-is.
+ *
+ * Both series must be aligned (same weeks, same length).
+ * Missing weeks in either channel should be filled with 0 before calling.
+ */
+export function combineChannels(
+  b2bSeries: number[],
+  b2cSeries: number[]
+): { combined: number[]; b2bCappedIndices: number[] } {
+  const { capped: cappedB2B, cappedIndices } = capB2BOutliers(b2bSeries)
+  const combined = cappedB2B.map((b2b, i) => b2b + (b2cSeries[i] ?? 0))
+  return { combined, b2bCappedIndices: cappedIndices }
 }
 
 // ── Dense Series Builder ────────────────────────────────────
@@ -240,13 +261,18 @@ export interface HistoryPoint {
   isoYear: number
   isoWeek: number
   qty: number
+  channel?: 'B2B' | 'B2C'  // when provided, B2B outliers are capped; B2C is always used as-is
 }
 
 /**
  * Generate 26-week demand forecast for a single SKU.
  *
+ * When history includes channel info, B2B event/campaign spikes are
+ * capped (trailing 12-wk mean+2σ) before combining with B2C.
+ * B2C is the true demand signal and is never modified.
+ *
  * @param sku        SKU code
- * @param history    Weekly actuals from sales_history (B2B+B2C combined), any order
+ * @param history    Weekly actuals from sales_history (any order)
  * @param startFrom  ISO week to start forecast from (default: current week + 1)
  */
 export function generateForecast(
@@ -259,8 +285,49 @@ export function generateForecast(
   const sorted = [...history].sort(
     (a, b) => a.isoYear * 100 + a.isoWeek - (b.isoYear * 100 + b.isoWeek)
   )
-  const rawSeries = buildDenseSeries(sorted)
-  const { capped: series, cappedIndices } = capOutliers(rawSeries)
+
+  if (sorted.length === 0) {
+    return { sku, model: 'avg', historyWeeks: 0, cappedWeeks: 0, points: [], mape: undefined }
+  }
+
+  // Build dense aligned week list across full history range
+  const firstWk = { isoYear: sorted[0].isoYear, isoWeek: sorted[0].isoWeek }
+  const lastWk  = { isoYear: sorted[sorted.length-1].isoYear, isoWeek: sorted[sorted.length-1].isoWeek }
+  const weeks: { isoYear: number; isoWeek: number }[] = []
+  let cur = { ...firstWk }
+  while (cur.isoYear < lastWk.isoYear || (cur.isoYear === lastWk.isoYear && cur.isoWeek <= lastWk.isoWeek)) {
+    weeks.push({ ...cur })
+    cur = addIsoWeeks(cur.isoYear, cur.isoWeek, 1)
+  }
+
+  const hasChannels = sorted.some(p => p.channel)
+  let series: number[]
+  let cappedWeeks = 0
+
+  if (hasChannels) {
+    // Separate B2B and B2C, cap B2B outliers, then combine
+    const b2bMap = new Map<string, number>()
+    const b2cMap = new Map<string, number>()
+    for (const p of sorted) {
+      const key = `${p.isoYear}-${p.isoWeek}`
+      if (p.channel === 'B2B') b2bMap.set(key, (b2bMap.get(key) ?? 0) + p.qty)
+      else                     b2cMap.set(key, (b2cMap.get(key) ?? 0) + p.qty)
+    }
+    const b2bSeries = weeks.map(w => b2bMap.get(`${w.isoYear}-${w.isoWeek}`) ?? 0)
+    const b2cSeries = weeks.map(w => b2cMap.get(`${w.isoYear}-${w.isoWeek}`) ?? 0)
+    const { combined, b2bCappedIndices } = combineChannels(b2bSeries, b2cSeries)
+    series = combined
+    cappedWeeks = b2bCappedIndices.length
+  } else {
+    // No channel info — aggregate directly, no capping
+    const combinedMap = new Map<string, number>()
+    for (const p of sorted) {
+      const key = `${p.isoYear}-${p.isoWeek}`
+      combinedMap.set(key, (combinedMap.get(key) ?? 0) + p.qty)
+    }
+    series = weeks.map(w => combinedMap.get(`${w.isoYear}-${w.isoWeek}`) ?? 0)
+  }
+
   const n = series.length
 
   let model: ForecastModel
@@ -280,7 +347,6 @@ export function generateForecast(
 
   const { lower, upper } = confidenceBounds(rawForecast, residuals)
 
-  // Determine forecast start week
   let { isoYear: curYear, isoWeek: curWeek } = startFrom ?? (() => {
     const iso = dateToIsoWeek(new Date())
     return addIsoWeeks(iso.isoYear, iso.isoWeek, 1)
@@ -316,5 +382,5 @@ export function generateForecast(
     }
   }
 
-  return { sku, model, historyWeeks: n, cappedWeeks: cappedIndices.length, points, mape }
+  return { sku, model, historyWeeks: n, cappedWeeks, points, mape }
 }

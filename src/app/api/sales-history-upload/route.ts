@@ -83,21 +83,18 @@ export async function POST(req: NextRequest) {
 
     for (const sku of affectedSkus) {
       const { data: history } = await supabase
-        .from('sales_history').select('iso_year, iso_week, qty').eq('sku', sku)
+        .from('sales_history').select('iso_year, iso_week, qty, channel').eq('sku', sku)
         .order('iso_year', { ascending: true }).order('iso_week', { ascending: true })
 
       if (!history || history.length === 0) continue
 
-      const weekMap = new Map<string, number>()
-      for (const h of history) {
-        const key = `${h.iso_year}-${h.iso_week}`
-        weekMap.set(key, (weekMap.get(key) ?? 0) + h.qty)
-      }
-
-      const historyPoints = Array.from(weekMap.entries()).map(([key, qty]) => {
-        const [isoYear, isoWeek] = key.split('-').map(Number)
-        return { isoYear, isoWeek, qty }
-      })
+      // Pass channel info — engine caps B2B outliers before combining with B2C
+      const historyPoints = history.map((h: any) => ({
+        isoYear: h.iso_year,
+        isoWeek: h.iso_week,
+        qty:     h.qty,
+        channel: h.channel as 'B2B' | 'B2C',
+      }))
 
       const startFrom = addIsoWeeks(...Object.values(dateToIsoWeek(new Date())) as [number, number], 1)
       const result = generateForecast(sku, historyPoints, startFrom)
