@@ -88,7 +88,6 @@ export async function POST(req: NextRequest) {
 
       if (!history || history.length === 0) continue
 
-      // Pass channel info — engine caps B2B outliers before combining with B2C
       const historyPoints = history.map((h: any) => ({
         isoYear: h.iso_year,
         isoWeek: h.iso_week,
@@ -100,14 +99,65 @@ export async function POST(req: NextRequest) {
       const result = generateForecast(sku, historyPoints, startFrom)
       forecastSummary[sku] = { model: result.model, historyWeeks: result.historyWeeks, cappedWeeks: result.cappedWeeks, mape: result.mape }
 
+      // ── Management seasonal index for ASP>0 SKUs ──────────────
+      // For DTC ad-driven SKUs (ASP>0), the GSheet monthly forecast already
+      // encodes expected demand shape. Use its monthly distribution as a
+      // seasonal multiplier on the HW base forecast.
+      // This replaces synthetic data duplication which would fabricate seasonality.
+      const skuAsp = Number(masterSkus?.find((m: any) => m.sku === sku)?.avg_selling_price ?? 0)
+      let forecastPoints = result.points
+
+      if (skuAsp > 0) {
+        // Load the GSheet monthly forecast for this SKU
+        const { data: gsheetFc } = await supabase
+          .from('sales_forecast')
+          .select('month_year, revenue_rm')
+          .eq('sku', sku)
+          .order('month_year', { ascending: true })
+
+        if (gsheetFc && gsheetFc.length >= 3) {
+          // Build month → revenue map
+          const monthRevMap = new Map(gsheetFc.map((r: any) => [r.month_year, Number(r.revenue_rm)]))
+
+          // Total GSheet revenue across all forecast months
+          const totalRevenue = Array.from(monthRevMap.values()).reduce((a, b) => a + b, 0)
+
+          if (totalRevenue > 0) {
+            // Map each forecast week to its month (YYYY-MM)
+            // and compute seasonal index = month_revenue / (total / n_months)
+            const nMonths = monthRevMap.size
+            const avgMonthlyRev = totalRevenue / nMonths
+
+            forecastPoints = result.points.map(p => {
+              const monthKey = p.weekStartDate.substring(0, 7) // 'YYYY-MM'
+              const monthRev = monthRevMap.get(monthKey)
+
+              if (monthRev === undefined) return p  // no GSheet data for this month, use HW as-is
+
+              const seasonalIndex = monthRev / avgMonthlyRev
+              const seasonalQty = Math.round(p.forecastQty * seasonalIndex)
+              const lowerAdj    = Math.round(p.lowerBound  * seasonalIndex)
+              const upperAdj    = Math.round(p.upperBound  * seasonalIndex)
+
+              return {
+                ...p,
+                forecastQty: Math.max(0, seasonalQty),
+                lowerBound:  Math.max(0, lowerAdj),
+                upperBound:  Math.max(0, upperAdj),
+              }
+            })
+          }
+        }
+      }
+
       const { data: wkCalendar } = await supabase.from('week_calendar')
-        .select('wk_label, monday_date').in('monday_date', result.points.map(p => p.weekStartDate))
+        .select('wk_label, monday_date').in('monday_date', forecastPoints.map(p => p.weekStartDate))
 
       const calMap = new Map((wkCalendar ?? []).map((w: any) => [w.monday_date, w.wk_label]))
       const brand  = skuBrandMap.get(sku) ?? 'Unknown'
 
       await supabase.from('demand_forecast').upsert(
-        result.points.map(p => ({
+        forecastPoints.map(p => ({
           sku, brand,
           iso_year:        p.isoYear,
           iso_week:        p.isoWeek,
@@ -116,7 +166,7 @@ export async function POST(req: NextRequest) {
           forecast_qty:    p.forecastQty,
           lower_bound:     p.lowerBound,
           upper_bound:     p.upperBound,
-          model_used:      result.model,
+          model_used:      skuAsp > 0 ? `${result.model}_mgmt_seasonal` : result.model,
           history_weeks:   result.historyWeeks,
           generated_at:    new Date().toISOString(),
         })),

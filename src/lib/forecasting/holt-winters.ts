@@ -74,7 +74,14 @@ function toWkLabel(isoWeek: number): string {
   return `WK${String(isoWeek).padStart(2, '0')}`
 }
 
-// ── Holt-Winters Double Exponential Smoothing ───────────────
+// ── Holt-Winters Double Exponential Smoothing (Damped Trend) ─
+//
+// Damping factor φ (phi) prevents runaway linear extrapolation.
+// Forecast(h) = level + (φ + φ² + ... + φʰ) × trend
+// φ=0.9 means trend contribution converges to level + 9×trend at infinity
+// vs undamped which grows to level + h×trend indefinitely.
+
+const PHI = 0.9  // damping factor — review monthly
 
 function hwSSE(series: number[], alpha: number, beta: number): number {
   let level = series[0]
@@ -82,9 +89,10 @@ function hwSSE(series: number[], alpha: number, beta: number): number {
   let sse = 0
   for (let i = 1; i < series.length; i++) {
     const prevLevel = level
-    level = alpha * series[i] + (1 - alpha) * (level + trend)
-    trend = beta * (level - prevLevel) + (1 - beta) * trend
-    sse += (series[i] - (level + trend)) ** 2
+    const fitted = level + PHI * trend
+    level = alpha * series[i] + (1 - alpha) * (level + PHI * trend)
+    trend = beta * (level - prevLevel) + (1 - beta) * PHI * trend
+    sse += (series[i] - fitted) ** 2
   }
   return sse
 }
@@ -101,15 +109,18 @@ function hwFit(
 
   for (let i = 1; i < series.length; i++) {
     const prevLevel = level
-    const fitted = level + trend
-    level = alpha * series[i] + (1 - alpha) * (level + trend)
-    trend = beta * (level - prevLevel) + (1 - beta) * trend
+    const fitted = level + PHI * trend
+    level = alpha * series[i] + (1 - alpha) * (level + PHI * trend)
+    trend = beta * (level - prevLevel) + (1 - beta) * PHI * trend
     residuals.push(series[i] - fitted)
   }
 
+  // Damped forecast: sum of geometric series φ + φ² + ... + φʰ
   const forecast: number[] = []
+  let phiSum = 0
   for (let h = 1; h <= horizon; h++) {
-    forecast.push(Math.max(0, level + h * trend))
+    phiSum += Math.pow(PHI, h)
+    forecast.push(Math.max(0, level + phiSum * trend))
   }
 
   return { forecast, residuals }
