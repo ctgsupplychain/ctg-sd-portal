@@ -266,6 +266,33 @@ function buildDenseSeries(sorted: HistoryPoint[]): number[] {
   return series
 }
 
+/**
+ * Fill null gaps in a weekly series with the trailing 8-week average.
+ * Prevents sparse gaps (e.g. stock-out weeks or WMS non-trading periods)
+ * from being treated as zero demand, which distorts the HW trend.
+ * Nulls at the start of the series use the first observed value.
+ */
+function fillGapsWithTrailingAvg(values: (number | null)[], window = 8): number[] {
+  const result: number[] = []
+  for (let i = 0; i < values.length; i++) {
+    if (values[i] !== null) {
+      result.push(values[i] as number)
+    } else {
+      // Trailing average of last `window` observed (non-null) values
+      const observed = result.filter(v => v > 0)
+      if (observed.length === 0) {
+        // No prior data — look ahead for first non-null
+        const ahead = values.slice(i + 1).find(v => v !== null)
+        result.push(ahead ?? 0)
+      } else {
+        const slice = observed.slice(-window)
+        result.push(Math.round(slice.reduce((a, b) => a + b, 0) / slice.length))
+      }
+    }
+  }
+  return result
+}
+
 // ── Main Entry Point ────────────────────────────────────────
 
 export interface HistoryPoint {
@@ -324,19 +351,25 @@ export function generateForecast(
       if (p.channel === 'B2B') b2bMap.set(key, (b2bMap.get(key) ?? 0) + p.qty)
       else                     b2cMap.set(key, (b2cMap.get(key) ?? 0) + p.qty)
     }
-    const b2bSeries = weeks.map(w => b2bMap.get(`${w.isoYear}-${w.isoWeek}`) ?? 0)
-    const b2cSeries = weeks.map(w => b2cMap.get(`${w.isoYear}-${w.isoWeek}`) ?? 0)
-    const { combined, b2bCappedIndices } = combineChannels(b2bSeries, b2cSeries)
+
+    // Fill gaps with trailing average (not zero) to avoid false downtrends
+    const b2cValues = weeks.map(w => b2cMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
+    const b2cFilled = fillGapsWithTrailingAvg(b2cValues)
+    const b2bValues = weeks.map(w => b2bMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
+    const b2bFilled = fillGapsWithTrailingAvg(b2bValues)
+
+    const { combined, b2bCappedIndices } = combineChannels(b2bFilled, b2cFilled)
     series = combined
     cappedWeeks = b2bCappedIndices.length
   } else {
-    // No channel info — aggregate directly, no capping
+    // No channel info — aggregate directly, fill gaps with trailing avg
     const combinedMap = new Map<string, number>()
     for (const p of sorted) {
       const key = `${p.isoYear}-${p.isoWeek}`
       combinedMap.set(key, (combinedMap.get(key) ?? 0) + p.qty)
     }
-    series = weeks.map(w => combinedMap.get(`${w.isoYear}-${w.isoWeek}`) ?? 0)
+    const rawValues = weeks.map(w => combinedMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
+    series = fillGapsWithTrailingAvg(rawValues)
   }
 
   const n = series.length

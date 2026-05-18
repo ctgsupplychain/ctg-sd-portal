@@ -73,7 +73,7 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
 
       {/* SKU selector row */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div ref={dropdownRef} className="relative w-[500px]">
+        <div ref={dropdownRef} className="relative w-[750px]">
           <button
             type="button"
             onClick={() => { setOpen(o => !o); setSearch('') }}
