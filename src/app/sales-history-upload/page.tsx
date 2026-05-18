@@ -93,9 +93,8 @@ export default function SalesHistoryUploadPage() {
       'delivered', 'dispatched', 'manifest_created', 'awaiting_dispatch'
     ])
     const WMS_TO_MASTER: Record<string, string> = {
-      'SDSDCA05': 'SDSDCA05S',
       'SDSDPM01': 'SDSDPM01S',
-      'SDSDSB01S': 'SDSDSH01S',
+      // SDSDCA05 and SDSDSB01S are now the master SKUs — no mapping needed
     }
 
     function parseWmsDate(raw: any): Date | null {
