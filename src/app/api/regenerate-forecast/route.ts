@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     const skuAspMap   = new Map((masterSkus ?? []).map((m: any) => [m.sku, Number(m.avg_selling_price ?? 0)]))
 
     // ── Regenerate per SKU ────────────────────────────────
-    const summary: Record<string, { model: string; historyWeeks: number; cappedWeeks: number; mape?: number }> = {}
+    const summary: Record<string, { model: string; historyWeeks: number; cappedWeeks: number; stockoutCorrectedWeeks: number; mape?: number }> = {}
     const errors: Record<string, string> = {}
 
     for (const sku of targetSkus) {
