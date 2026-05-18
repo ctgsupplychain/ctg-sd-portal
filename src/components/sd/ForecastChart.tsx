@@ -161,6 +161,24 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       })
     }
 
+    // Safety stock reference line — flat horizontal across full chart width
+    const safetyStock = skuResult?.sku.safetyStock ?? 0
+    if (safetyStock > 0) {
+      const totalPoints = nHist + nFc
+      datasets.push({
+        label: 'Safety stock',
+        data: new Array(totalPoints).fill(safetyStock),
+        borderColor: '#EF9F27',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [3, 3],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        tension: 0,
+        order: 0,
+      })
+    }
+
     const ctx = canvasRef.current.getContext('2d')
     chartRef.current = new chartLib.current.Chart(ctx, {
       type: 'line',
@@ -175,6 +193,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
               label: (item: any) => {
                 if (item.raw === null) return null
                 if (['CI upper', 'CI lower'].includes(item.dataset.label)) return null
+                if (item.dataset.label === 'Safety stock') return ` Safety stock: ${Math.round(item.raw).toLocaleString()} units`
                 return ` ${item.dataset.label}: ${Math.round(item.raw).toLocaleString()} units`
               }
             }
@@ -234,6 +253,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
           { color: '#888780', label: 'Actuals',  dash: false },
           { color: '#1D9E75', label: asp > 0 ? 'Stat. model' : 'Forecast', dash: false },
           { color: '#378ADD', label: 'S&D plan', dash: true },
+          { color: '#EF9F27', label: 'Safety stock', dash: true },
         ].map(l => (
           <span key={l.label} className="flex items-center gap-1.5 text-xs text-[#667085]">
             <svg width="20" height="10" aria-hidden="true">
