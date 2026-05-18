@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
-import { Upload, CheckCircle, AlertTriangle, ChevronDown, ChevronUp, BarChart2 } from 'lucide-react'
+import { Upload, CheckCircle, AlertTriangle, ChevronDown, ChevronUp, BarChart2, RefreshCw } from 'lucide-react'
 import BackToSD from '@/components/layout/BackToSD'
 
 type Channel = 'B2B' | 'B2C'
@@ -60,7 +60,8 @@ export default function SalesHistoryUploadPage() {
   const [b2cFile, setB2cFile] = useState<File | null>(null)
   const [draggingB2b, setDraggingB2b] = useState(false)
   const [draggingB2c, setDraggingB2c] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading,       setLoading]       = useState(false)
+  const [regenerating,  setRegenerating]  = useState(false)
   const [results, setResults] = useState<UploadResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showSkipped, setShowSkipped] = useState(false)
@@ -192,6 +193,41 @@ export default function SalesHistoryUploadPage() {
     }
 
     return res.json()
+  }
+
+  const handleRegenerate = async () => {
+    setRegenerating(true)
+    setError(null)
+    setResults([])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+
+      const res = await fetch('/api/regenerate-forecast', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),  // regenerate all SKUs in sales_history
+      })
+
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Regeneration failed')
+
+      setResults([{
+        success: true,
+        channel: 'B2C' as const,
+        parseStats: { totalLineItems: 0, validLineItems: 0, skippedLineItems: 0, dateRange: null },
+        salesHistory: { weeklyRowsProcessed: 0, upserted: 0 },
+        forecast: { skusUpdated: json.skusUpdated, summary: json.summary },
+        warnings: { unknownSkus: [] },
+      }])
+    } catch (err: any) {
+      setError(err.message ?? 'Unexpected error')
+    } finally {
+      setRegenerating(false)
+    }
   }
 
   const handleUpload = async () => {
@@ -333,6 +369,18 @@ export default function SalesHistoryUploadPage() {
           onChange={f => setB2cFile(f)}
         />
       </div>
+
+      <button
+        onClick={handleRegenerate}
+        disabled={regenerating || loading}
+        className="w-full border border-teal-600 text-teal-600 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+      >
+        {regenerating ? (
+          <><span className="w-4 h-4 border-2 border-teal-600/30 border-t-teal-600 rounded-full animate-spin" />Regenerating...</>
+        ) : (
+          <><RefreshCw size={15} />Regenerate Forecast from Existing Data</>
+        )}
+      </button>
 
       <button
         onClick={handleUpload}
