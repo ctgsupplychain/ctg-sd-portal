@@ -51,7 +51,7 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
 
   if (!current) return null
 
-  const selectedLabel = `${current.sku.sku} — ${(current.sku.description || '').slice(0, 45)}`
+  const selectedLabel = `${current.sku.sku} — ${current.sku.description || ''}`
   const flag = FLAG_DISPLAY[current.flag]
 
   const monthSpans: { label: string; count: number }[] = []
@@ -109,7 +109,7 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
                       s.sku.sku === selectedSku ? 'bg-[#F0FAF9] text-[#048A81] font-medium' : 'text-[#101828]'
                     )}
                   >
-                    {s.sku.sku} — {(s.sku.description || '').slice(0, 50)}
+                    {s.sku.sku} — {s.sku.description || ''}
                   </li>
                 ))}
               </ul>

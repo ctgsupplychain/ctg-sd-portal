@@ -122,6 +122,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
 
+    // ── Sync descriptions from WMS to master_sku ──────────────
+    // WMS product_name_en is the authoritative description source.
+    // Update master_sku.description for any SKU where it differs.
+    const descUpdates = deduped
+      .filter(r => r.sku && r.product_name_en)
+      .reduce((acc: Record<string, string>, r) => {
+        // Keep the first (most recent after dedup) description per SKU
+        if (!acc[r.sku]) acc[r.sku] = r.product_name_en
+        return acc
+      }, {})
+
+    for (const [sku, description] of Object.entries(descUpdates)) {
+      await supabase
+        .from('master_sku')
+        .update({ description })
+        .eq('sku', sku)
+        .is('description', null)  // only update if blank — don't overwrite manual edits
+        // also update if description differs from WMS
+    }
+
+    // Broader sync: update all SKUs where description doesn't match WMS
+    for (const [sku, description] of Object.entries(descUpdates)) {
+      await supabase
+        .from('master_sku')
+        .update({ description })
+        .eq('sku', sku)
+        .neq('description', description)
+    }
+
     return NextResponse.json({
       success: true,
       total_rows: rows.length,
