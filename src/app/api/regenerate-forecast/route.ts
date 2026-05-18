@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
 
             const monthRevMap = new Map<string, number>()
             for (const [col, monthKey] of Object.entries(colToMonth)) {
-              const val = Number(gsheet[col] ?? 0)
+              const val = Number((gsheet as any)[col] ?? 0)
               if (val > 0) monthRevMap.set(monthKey, val)
             }
 

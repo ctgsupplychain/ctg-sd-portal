@@ -217,7 +217,7 @@ export default function SalesHistoryUploadPage() {
       setResults([{
         success: true,
         channel: 'B2C' as const,
-        parseStats: { totalLineItems: 0, validLineItems: 0, skippedLineItems: 0, dateRange: null },
+        parseStats: { totalLineItems: 0, validLineItems: 0, skippedLineItems: 0, skippedStatuses: {}, dateRange: null },
         salesHistory: { weeklyRowsProcessed: 0, upserted: 0 },
         forecast: { skusUpdated: json.skusUpdated, summary: json.summary },
         warnings: { unknownSkus: [] },

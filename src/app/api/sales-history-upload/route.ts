@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(rows) || rows.length === 0)
       return NextResponse.json({ error: 'No rows provided' }, { status: 400 })
 
-    const { data: masterSkus } = await supabase.from('master_sku').select('sku, brand')
+    const { data: masterSkus } = await supabase.from('master_sku').select('sku, brand, avg_selling_price')
     const masterSkuSet = new Set((masterSkus ?? []).map((m: any) => m.sku))
     const skuBrandMap  = new Map((masterSkus ?? []).map((m: any) => [m.sku, m.brand]))
 
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
 
           const monthRevMap = new Map<string, number>()
           for (const [col, monthKey] of Object.entries(colToMonth)) {
-            const val = Number(gsheet[col] ?? 0)
+            const val = Number((gsheet as any)[col] ?? 0)
             if (val > 0) monthRevMap.set(monthKey, val)
           }
 
