@@ -96,7 +96,22 @@ export async function POST(req: NextRequest) {
       }))
 
       const startFrom = addIsoWeeks(...Object.values(dateToIsoWeek(new Date())) as [number, number], 1)
-      const result = generateForecast(sku, historyPoints, startFrom)
+
+      // Load confirmed stockout weeks from weekly_atp_snapshot view
+      const { data: atpData } = await supabase
+        .from('weekly_atp_snapshot')
+        .select('iso_year, iso_week, min_atp')
+        .eq('sku', sku)
+
+      const stockoutWeeks = new Set<string>()
+      for (const row of atpData ?? []) {
+        if (row.min_atp === 0) stockoutWeeks.add(`${row.iso_year}-${row.iso_week}`)
+      }
+      const hasAtpData = (atpData ?? []).length > 0
+
+      const result = generateForecast(sku, historyPoints, startFrom,
+        hasAtpData ? stockoutWeeks : undefined
+      )
       forecastSummary[sku] = { model: result.model, historyWeeks: result.historyWeeks, cappedWeeks: result.cappedWeeks, mape: result.mape }
 
       // ── Management seasonal index for ASP>0 SKUs ──────────────

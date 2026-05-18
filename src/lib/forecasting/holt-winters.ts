@@ -27,9 +27,10 @@ export interface ForecastResult {
   sku: string
   model: ForecastModel
   historyWeeks: number
-  cappedWeeks: number       // number of outlier weeks replaced before model fitting
+  cappedWeeks: number           // B2B event weeks capped
+  stockoutCorrectedWeeks: number // zero-demand weeks corrected due to stockout
   points: ForecastPoint[]
-  mape?: number           // Mean Absolute Percentage Error on last-4-week holdout
+  mape?: number
 }
 
 // ── ISO week utilities ──────────────────────────────────────
@@ -293,6 +294,51 @@ function fillGapsWithTrailingAvg(values: (number | null)[], window = 8): number[
   return result
 }
 
+/**
+ * Apply stockout-aware demand correction to a weekly series.
+ *
+ * For each week where observed demand is zero:
+ *   - ATP = 0 confirmed → stockout (censored demand) → replace with trailing 8-wk avg
+ *   - ATP > 0 confirmed → genuine zero demand → keep as 0
+ *   - No ATP data for that week → trailing avg fallback (conservative)
+ *
+ * @param series        Dense weekly demand series
+ * @param stockoutWeeks Set of 'isoYear-isoWeek' keys where min_atp = 0
+ * @param weekKeys      Parallel array of 'isoYear-isoWeek' keys for each series point
+ * @param hasAtpData    Whether ANY ATP data exists for this SKU (activates genuine-zero logic)
+ */
+export function applyStockoutCorrection(
+  series: number[],
+  stockoutWeeks: Set<string>,
+  weekKeys: string[],
+  hasAtpData: boolean,
+  window = 8
+): { corrected: number[]; correctedCount: number } {
+  const corrected = [...series]
+  let correctedCount = 0
+
+  for (let i = 0; i < series.length; i++) {
+    if (series[i] > 0) continue
+
+    const isConfirmedStockout = stockoutWeeks.has(weekKeys[i])
+    // If we have ATP data and stock was available → genuine zero → leave as-is
+    if (hasAtpData && !isConfirmedStockout) continue
+
+    // Confirmed stockout OR no ATP data → treat as censored demand
+    const observed = corrected.slice(0, i).filter(v => v > 0)
+    if (observed.length > 0) {
+      const slice = observed.slice(-window)
+      const trailingAvg = Math.round(slice.reduce((a, b) => a + b, 0) / slice.length)
+      if (trailingAvg > 0) {
+        corrected[i] = trailingAvg
+        correctedCount++
+      }
+    }
+  }
+
+  return { corrected, correctedCount }
+}
+
 // ── Main Entry Point ────────────────────────────────────────
 
 export interface HistoryPoint {
@@ -316,7 +362,8 @@ export interface HistoryPoint {
 export function generateForecast(
   sku: string,
   history: HistoryPoint[],
-  startFrom?: { isoYear: number; isoWeek: number }
+  startFrom?: { isoYear: number; isoWeek: number },
+  stockoutWeeks?: Set<string>   // 'isoYear-isoWeek' keys where ATP=0 confirmed
 ): ForecastResult {
   const HORIZON = 26
 
@@ -325,7 +372,7 @@ export function generateForecast(
   )
 
   if (sorted.length === 0) {
-    return { sku, model: 'avg', historyWeeks: 0, cappedWeeks: 0, points: [], mape: undefined }
+    return { sku, model: 'avg', historyWeeks: 0, cappedWeeks: 0, stockoutCorrectedWeeks: 0, points: [], mape: undefined }
   }
 
   // Build dense aligned week list across full history range
@@ -337,13 +384,13 @@ export function generateForecast(
     weeks.push({ ...cur })
     cur = addIsoWeeks(cur.isoYear, cur.isoWeek, 1)
   }
+  const weekKeys = weeks.map(w => `${w.isoYear}-${w.isoWeek}`)
 
   const hasChannels = sorted.some(p => p.channel)
   let series: number[]
   let cappedWeeks = 0
 
   if (hasChannels) {
-    // Separate B2B and B2C, cap B2B outliers, then combine
     const b2bMap = new Map<string, number>()
     const b2cMap = new Map<string, number>()
     for (const p of sorted) {
@@ -352,7 +399,6 @@ export function generateForecast(
       else                     b2cMap.set(key, (b2cMap.get(key) ?? 0) + p.qty)
     }
 
-    // Fill gaps with trailing average (not zero) to avoid false downtrends
     const b2cValues = weeks.map(w => b2cMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
     const b2cFilled = fillGapsWithTrailingAvg(b2cValues)
     const b2bValues = weeks.map(w => b2bMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
@@ -362,7 +408,6 @@ export function generateForecast(
     series = combined
     cappedWeeks = b2bCappedIndices.length
   } else {
-    // No channel info — aggregate directly, fill gaps with trailing avg
     const combinedMap = new Map<string, number>()
     for (const p of sorted) {
       const key = `${p.isoYear}-${p.isoWeek}`
@@ -371,6 +416,12 @@ export function generateForecast(
     const rawValues = weeks.map(w => combinedMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
     series = fillGapsWithTrailingAvg(rawValues)
   }
+
+  // Apply stockout correction — replace confirmed stockout zeros with trailing avg
+  const hasAtpData = stockoutWeeks !== undefined
+  const { corrected: seriesAfterStockout, correctedCount: stockoutCorrectedWeeks } =
+    applyStockoutCorrection(series, stockoutWeeks ?? new Set(), weekKeys, hasAtpData)
+  series = seriesAfterStockout
 
   const n = series.length
 
@@ -426,5 +477,5 @@ export function generateForecast(
     }
   }
 
-  return { sku, model, historyWeeks: n, cappedWeeks, points, mape }
+  return { sku, model, historyWeeks: n, cappedWeeks, stockoutCorrectedWeeks, points, mape }
 }
