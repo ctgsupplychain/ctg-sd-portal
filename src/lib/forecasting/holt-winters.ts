@@ -81,7 +81,7 @@ function toWkLabel(isoWeek: number): string {
 // φ=0.9 means trend contribution converges to level + 9×trend at infinity
 // vs undamped which grows to level + h×trend indefinitely.
 
-const PHI = 0.9  // damping factor — review monthly
+const PHI = 0.57  // damping factor — review monthly (0.57 brings WK26 near S&D plan level)
 
 function hwSSE(series: number[], alpha: number, beta: number): number {
   let level = series[0]

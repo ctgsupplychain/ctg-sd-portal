@@ -100,50 +100,55 @@ export async function POST(req: NextRequest) {
       forecastSummary[sku] = { model: result.model, historyWeeks: result.historyWeeks, cappedWeeks: result.cappedWeeks, mape: result.mape }
 
       // ── Management seasonal index for ASP>0 SKUs ──────────────
-      // For DTC ad-driven SKUs (ASP>0), the GSheet monthly forecast already
-      // encodes expected demand shape. Use its monthly distribution as a
-      // seasonal multiplier on the HW base forecast.
-      // This replaces synthetic data duplication which would fabricate seasonality.
+      // sales_forecast table stores monthly revenue as wide columns:
+      // may_26, jun_26, jul_26 ... mar_27 per brand row.
+      // Use the latest submission for this brand as seasonal weights.
       const skuAsp = Number(masterSkus?.find((m: any) => m.sku === sku)?.avg_selling_price ?? 0)
       let forecastPoints = result.points
 
       if (skuAsp > 0) {
-        // Load the GSheet monthly forecast for this SKU
-        const { data: gsheetFc } = await supabase
+        const skuBrand = skuBrandMap.get(sku) ?? ''
+
+        const { data: gsheetRows } = await supabase
           .from('sales_forecast')
-          .select('month_year, revenue_rm')
-          .eq('sku', sku)
-          .order('month_year', { ascending: true })
+          .select('may_26, jun_26, jul_26, aug_26, sep_26, oct_26, nov_26, dec_26, jan_27, feb_27, mar_27, apr_27')
+          .eq('brand', skuBrand)
+          .order('submitted_at', { ascending: false })
+          .limit(1)
 
-        if (gsheetFc && gsheetFc.length >= 3) {
-          // Build month → revenue map
-          const monthRevMap = new Map(gsheetFc.map((r: any) => [r.month_year, Number(r.revenue_rm)]))
+        const gsheet = gsheetRows?.[0]
 
-          // Total GSheet revenue across all forecast months
+        if (gsheet) {
+          // Map column name → YYYY-MM key
+          const colToMonth: Record<string, string> = {
+            may_26: '2026-05', jun_26: '2026-06', jul_26: '2026-07',
+            aug_26: '2026-08', sep_26: '2026-09', oct_26: '2026-10',
+            nov_26: '2026-11', dec_26: '2026-12', jan_27: '2027-01',
+            feb_27: '2027-02', mar_27: '2027-03', apr_27: '2027-04',
+          }
+
+          const monthRevMap = new Map<string, number>()
+          for (const [col, monthKey] of Object.entries(colToMonth)) {
+            const val = Number(gsheet[col] ?? 0)
+            if (val > 0) monthRevMap.set(monthKey, val)
+          }
+
           const totalRevenue = Array.from(monthRevMap.values()).reduce((a, b) => a + b, 0)
 
-          if (totalRevenue > 0) {
-            // Map each forecast week to its month (YYYY-MM)
-            // and compute seasonal index = month_revenue / (total / n_months)
-            const nMonths = monthRevMap.size
-            const avgMonthlyRev = totalRevenue / nMonths
+          if (totalRevenue > 0 && monthRevMap.size > 0) {
+            const avgMonthlyRev = totalRevenue / monthRevMap.size
 
             forecastPoints = result.points.map(p => {
-              const monthKey = p.weekStartDate.substring(0, 7) // 'YYYY-MM'
+              const monthKey = p.weekStartDate.substring(0, 7) // 'YYYY-MM' from 'YYYY-MM-DD'
               const monthRev = monthRevMap.get(monthKey)
-
-              if (monthRev === undefined) return p  // no GSheet data for this month, use HW as-is
+              if (!monthRev) return p
 
               const seasonalIndex = monthRev / avgMonthlyRev
-              const seasonalQty = Math.round(p.forecastQty * seasonalIndex)
-              const lowerAdj    = Math.round(p.lowerBound  * seasonalIndex)
-              const upperAdj    = Math.round(p.upperBound  * seasonalIndex)
-
               return {
                 ...p,
-                forecastQty: Math.max(0, seasonalQty),
-                lowerBound:  Math.max(0, lowerAdj),
-                upperBound:  Math.max(0, upperAdj),
+                forecastQty: Math.max(0, Math.round(p.forecastQty * seasonalIndex)),
+                lowerBound:  Math.max(0, Math.round(p.lowerBound  * seasonalIndex)),
+                upperBound:  Math.max(0, Math.round(p.upperBound  * seasonalIndex)),
               }
             })
           }
