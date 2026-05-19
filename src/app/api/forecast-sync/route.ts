@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         year,
         ...carried,
         submitted_at: safeDate(row['Timestamp']) > 0 ? new Date(row['Timestamp']).toISOString() : new Date().toISOString(),
-      }, { onConflict: 'brand,submission_wk,year' })
+      }, { onConflict: 'brand,project,submission_wk,year' })  // ← FIXED: added project to conflict key
 
       results.push({
         project: projectName,
