@@ -2,10 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
 
+// Increase max body size for large WMS xlsx uploads
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// Brand SKU prefix mapping — extend per brand
+const SKU_BRAND_MAP: Record<string, string> = {
+  SD: 'SkinDae',
+  // NL: 'Naturelish',   // future
+  // IP: 'IProcare',     // future
+  // MJ: 'Mejorecare',   // future
+  // BL: 'Bonlife',      // future
+}
+
+function resolveBrand(sku: string, wmsBrand: string | null): string {
+  if (wmsBrand && wmsBrand.trim()) return wmsBrand.trim()
+  // Fallback: derive from SKU prefix (first 2 chars)
+  const prefix = sku.slice(0, 2).toUpperCase()
+  return SKU_BRAND_MAP[prefix] ?? ''
+}
 
 // SkinDae SKU whitelist — expand per brand in future
 const SKINDAE_SKUS = [
@@ -44,7 +64,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse multipart form data
-    const formData = await req.formData()
+    let formData: FormData
+    try {
+      formData = await req.formData()
+    } catch (formErr: any) {
+      console.error('FormData parse error:', formErr)
+      return NextResponse.json(
+        { error: `Failed to parse uploaded file: ${formErr.message ?? 'Unknown error'}` },
+        { status: 400 }
+      )
+    }
+
     const file = formData.get('file') as File
     const snapshotDate = formData.get('snapshot_date') as string
 
@@ -68,34 +98,38 @@ export async function POST(req: NextRequest) {
     // Map column names from WMS report to DB columns
     const mapped = rows
       .filter(row => row['SKU'] && typeof row['SKU'] === 'string' && row['SKU'].trim())
-      .map(row => ({
-        snapshot_date:      snapshotDate,
-        company_name:       row['Company Name']           ?? null,
-        warehouse_code:     row['Warehouse Code']         ?? null,
-        product_name_en:    row['Product Name English']   ?? null,
-        product_name_local: row['Product Name Local']     ?? null,
-        sku:                String(row['SKU']).trim(),
-        mfupc:              row['Mfupc/Upc/Ean']          ?? null,
-        base_uom:           row['Base Uom']               ?? null,
-        atp:                Number(row['ATP'])             || 0,
-        usable:             Number(row['Usable'])          || 0,
-        unusable:           Number(row['Unusable'])        || 0,
-        incoming:           Number(row['Incoming'])        || 0,
-        picking:            Number(row['Picking'])         || 0,
-        in_process:         Number(row['In-Process'])      || 0,
-        problem_order:      Number(row['Problem Order'])   || 0,
-        blocked_usable:     Number(row['Blocked Usable'])  || 0,
-        blocked_unusable:   Number(row['Blocked Unusable'])|| 0,
-        buffer:             Number(row['Buffer'])          || 0,
-        in_transfer:        Number(row['In-transfer'])     || 0,
-        in_stock_take:      Number(row['In-stock take'])   || 0,
-        in_adjustment:      Number(row['In-adjustment'])   || 0,
-        total_cbm:          Number(row['Total CBM'])       || 0,
-        brand:              row['Brand']                   ?? null,
-        product_category:   row['Product Category']       ?? null,
-        uploaded_by:        user.email,
-        uploaded_at:        new Date().toISOString(),
-      }))
+      .map(row => {
+        const sku = String(row['SKU']).trim()
+        const wmsBrand = row['Brand'] ?? null
+        return {
+          snapshot_date:      snapshotDate,
+          company_name:       row['Company Name']           ?? null,
+          warehouse_code:     row['Warehouse Code']         ?? null,
+          product_name_en:    row['Product Name English']   ?? null,
+          product_name_local: row['Product Name Local']     ?? null,
+          sku,
+          mfupc:              row['Mfupc/Upc/Ean']          ?? null,
+          base_uom:           row['Base Uom']               ?? null,
+          atp:                Number(row['ATP'])             || 0,
+          usable:             Number(row['Usable'])          || 0,
+          unusable:           Number(row['Unusable'])        || 0,
+          incoming:           Number(row['Incoming'])        || 0,
+          picking:            Number(row['Picking'])         || 0,
+          in_process:         Number(row['In-Process'])      || 0,
+          problem_order:      Number(row['Problem Order'])   || 0,
+          blocked_usable:     Number(row['Blocked Usable'])  || 0,
+          blocked_unusable:   Number(row['Blocked Unusable'])|| 0,
+          buffer:             Number(row['Buffer'])          || 0,
+          in_transfer:        Number(row['In-transfer'])     || 0,
+          in_stock_take:      Number(row['In-stock take'])   || 0,
+          in_adjustment:      Number(row['In-adjustment'])   || 0,
+          total_cbm:          Number(row['Total CBM'])       || 0,
+          brand:              resolveBrand(sku, wmsBrand),
+          product_category:   row['Product Category']       ?? null,
+          uploaded_by:        user.email,
+          uploaded_at:        new Date().toISOString(),
+        }
+      })
 
     // Deduplicate: if same SKU appears multiple times, keep first occurrence
     const seen = new Set<string>()
@@ -122,13 +156,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
 
-    // ── Sync descriptions from WMS to master_sku ──────────────
-    // WMS product_name_en is the authoritative description source.
-    // Update master_sku.description for any SKU where it differs.
+    // Sync descriptions from WMS to master_sku (only where blank)
     const descUpdates = deduped
       .filter(r => r.sku && r.product_name_en)
       .reduce((acc: Record<string, string>, r) => {
-        // Keep the first (most recent after dedup) description per SKU
         if (!acc[r.sku]) acc[r.sku] = r.product_name_en
         return acc
       }, {})
@@ -138,11 +169,10 @@ export async function POST(req: NextRequest) {
         .from('master_sku')
         .update({ description })
         .eq('sku', sku)
-        .is('description', null)  // only update if blank — don't overwrite manual edits
-        // also update if description differs from WMS
+        .is('description', null)
     }
 
-    // Broader sync: update all SKUs where description doesn't match WMS
+    // Update where description differs from WMS
     for (const [sku, description] of Object.entries(descUpdates)) {
       await supabase
         .from('master_sku')
