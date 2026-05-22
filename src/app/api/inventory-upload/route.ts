@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
     const token = authHeader.replace('Bearer ', '')
 
-    // Run auth + body parse in parallel
+    // Parallel: auth check + body parse
     const [authResult, body] = await Promise.all([
       supabase.auth.getUser(token),
       req.json().catch(() => null),
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    // Role check — use service role client so no extra round-trip auth
+    // Role check
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -115,21 +115,16 @@ export async function POST(req: NextRequest) {
     const uploadedSkus = new Set(deduped.map((r: any) => r.sku))
     const missingSkinDae = SKINDAE_SKUS.filter(s => !uploadedSkus.has(s))
 
-    // Main upsert
-    const { error: upsertError, count } = await supabase
-      .from('wms_inventory_snapshots')
-      .upsert(deduped, {
-        onConflict: 'sku,snapshot_date',
-        count: 'exact',
-      })
+    // Single Postgres function call — one round trip regardless of row count
+    const { data: upsertCount, error: upsertError } = await supabase
+      .rpc('bulk_upsert_wms_snapshots', { rows: deduped })
 
     if (upsertError) {
       console.error('Upsert error:', upsertError)
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
 
-    // Sync WMS product names → master_sku in a single bulk upsert (non-blocking)
-    // Fire-and-forget: don't await — keeps response under 10s
+    // Fire-and-forget description sync (non-blocking)
     const descRows = deduped
       .filter((r: any) => r.sku && r.product_name_en)
       .map((r: any) => ({ sku: r.sku, description: r.product_name_en }))
@@ -141,7 +136,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       total_rows: rows.length,
-      upserted: count,
+      upserted: upsertCount,
       duplicates_removed: mapped.length - deduped.length,
       missing_skindae_skus: missingSkinDae,
     })
