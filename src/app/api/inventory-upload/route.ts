@@ -53,7 +53,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    // Role check
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -115,7 +114,7 @@ export async function POST(req: NextRequest) {
     const uploadedSkus = new Set(deduped.map((r: any) => r.sku))
     const missingSkinDae = SKINDAE_SKUS.filter(s => !uploadedSkus.has(s))
 
-    // Single Postgres function call — one round trip regardless of row count
+    // Single Postgres function — one DB round trip for all rows
     const { data: upsertCount, error: upsertError } = await supabase
       .rpc('bulk_upsert_wms_snapshots', { rows: deduped })
 
@@ -124,13 +123,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
 
-    // Fire-and-forget description sync (non-blocking)
+    // Fire-and-forget desc sync — Promise.resolve() ensures full Promise interface
     const descRows = deduped
       .filter((r: any) => r.sku && r.product_name_en)
       .map((r: any) => ({ sku: r.sku, description: r.product_name_en }))
 
     if (descRows.length > 0) {
-      supabase.rpc('sync_wms_descriptions', { updates: descRows }).then(() => {}).catch(() => {})
+      Promise.resolve(supabase.rpc('sync_wms_descriptions', { updates: descRows })).catch(() => {})
     }
 
     return NextResponse.json({
