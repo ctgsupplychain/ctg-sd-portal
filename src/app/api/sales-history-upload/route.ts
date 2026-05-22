@@ -95,7 +95,8 @@ export async function POST(req: NextRequest) {
         channel: h.channel as 'B2B' | 'B2C',
       }))
 
-      const startFrom = addIsoWeeks(...Object.values(dateToIsoWeek(new Date())) as [number, number], 1)
+      const { isoYear: _y, isoWeek: _w } = dateToIsoWeek(new Date())
+      const startFrom = { isoYear: _y, isoWeek: _w }
 
       // Load confirmed stockout weeks from weekly_atp_snapshot view
       const { data: atpData } = await supabase
