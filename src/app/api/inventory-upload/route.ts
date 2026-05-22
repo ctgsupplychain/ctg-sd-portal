@@ -36,12 +36,24 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+
+    // Run auth + body parse in parallel
+    const [authResult, body] = await Promise.all([
+      supabase.auth.getUser(token),
+      req.json().catch(() => null),
+    ])
+
+    const { data: { user }, error: authError } = authResult
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    // Role check — use service role client so no extra round-trip auth
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -52,14 +64,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Accept pre-parsed JSON rows from client (xlsx parsed browser-side)
-    let body: { rows: any[]; snapshot_date: string }
-    try {
-      body = await req.json()
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-    }
-
     const { rows, snapshot_date: snapshotDate } = body
 
     if (!rows?.length || !snapshotDate) {
@@ -67,8 +71,8 @@ export async function POST(req: NextRequest) {
     }
 
     const mapped = rows
-      .filter(row => row['SKU'] && typeof row['SKU'] === 'string' && String(row['SKU']).trim())
-      .map(row => {
+      .filter((row: any) => row['SKU'] && typeof row['SKU'] === 'string' && String(row['SKU']).trim())
+      .map((row: any) => {
         const sku = String(row['SKU']).trim()
         const wmsBrand = row['Brand'] ?? null
         return {
@@ -102,15 +106,16 @@ export async function POST(req: NextRequest) {
       })
 
     const seen = new Set<string>()
-    const deduped = mapped.filter(row => {
+    const deduped = mapped.filter((row: any) => {
       if (seen.has(row.sku)) return false
       seen.add(row.sku)
       return true
     })
 
-    const uploadedSkus = new Set(deduped.map(r => r.sku))
+    const uploadedSkus = new Set(deduped.map((r: any) => r.sku))
     const missingSkinDae = SKINDAE_SKUS.filter(s => !uploadedSkus.has(s))
 
+    // Main upsert
     const { error: upsertError, count } = await supabase
       .from('wms_inventory_snapshots')
       .upsert(deduped, {
@@ -123,26 +128,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
 
-    // Sync product descriptions to master_sku where blank or stale
-    const descUpdates = deduped
-      .filter(r => r.sku && r.product_name_en)
-      .reduce((acc: Record<string, string>, r) => {
-        if (!acc[r.sku]) acc[r.sku] = r.product_name_en
-        return acc
-      }, {})
+    // Sync WMS product names → master_sku in a single bulk upsert (non-blocking)
+    // Fire-and-forget: don't await — keeps response under 10s
+    const descRows = deduped
+      .filter((r: any) => r.sku && r.product_name_en)
+      .map((r: any) => ({ sku: r.sku, description: r.product_name_en }))
 
-    for (const [sku, description] of Object.entries(descUpdates)) {
-      await supabase
-        .from('master_sku')
-        .update({ description })
-        .eq('sku', sku)
-        .is('description', null)
-
-      await supabase
-        .from('master_sku')
-        .update({ description })
-        .eq('sku', sku)
-        .neq('description', description)
+    if (descRows.length > 0) {
+      supabase.rpc('sync_wms_descriptions', { updates: descRows }).then(() => {}).catch(() => {})
     }
 
     return NextResponse.json({
