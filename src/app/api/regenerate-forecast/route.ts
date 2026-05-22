@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
         }))
 
         const curIso    = dateToIsoWeek(new Date())
-        const startFrom = addIsoWeeks(curIso.isoYear, curIso.isoWeek, 1)
+        const startFrom = { isoYear: curIso.isoYear, isoWeek: curIso.isoWeek }
 
         // Load confirmed stockout weeks from weekly_atp_snapshot view
         const { data: atpData } = await supabase
