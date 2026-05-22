@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
+import * as XLSX from 'xlsx'
 import BackToSD from '@/components/layout/BackToSD'
 
 interface UploadResult {
@@ -65,19 +66,35 @@ export default function InventoryUploadPage() {
         return
       }
 
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('snapshot_date', snapshotDate)
+      // Parse xlsx client-side to avoid serverless timeout on large files
+      const arrayBuffer = await file.arrayBuffer()
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      const sheet = workbook.Sheets[sheetName]
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: 0 })
+
+      if (!rows.length) {
+        setError('No data found in the uploaded file.')
+        return
+      }
 
       const res = await fetch('/api/inventory-upload', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify({ rows, snapshot_date: snapshotDate }),
       })
 
-      const json = await res.json()
+      let json: any
+      try {
+        json = await res.json()
+      } catch {
+        const text = await res.text().catch(() => 'No response body')
+        setError(`Server error (${res.status}): ${text.slice(0, 200)}`)
+        return
+      }
 
       if (!res.ok) {
         setError(json.error ?? 'Upload failed.')
@@ -138,7 +155,7 @@ export default function InventoryUploadPage() {
           </div>
         ) : (
           <div>
-            <p className="text-sm text-gray-500">Drag & drop your WMS .xlsx file here</p>
+            <p className="text-sm text-gray-500">Drag &amp; drop your WMS .xlsx file here</p>
             <p className="text-xs text-gray-400 mt-1">or click to browse</p>
           </div>
         )}
@@ -149,7 +166,7 @@ export default function InventoryUploadPage() {
         disabled={!file || !snapshotDate || loading}
         className="mt-6 w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
       >
-        {loading ? 'Uploading...' : 'Upload & Save'}
+        {loading ? 'Parsing & uploading...' : 'Upload & Save'}
       </button>
 
       {error && (
