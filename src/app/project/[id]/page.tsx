@@ -19,7 +19,19 @@ import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { loadDemandForecast } from '@/lib/forecasting/forecast-lookup'
 import { RefreshCw, Download } from 'lucide-react'
 
-const CURRENT_WK = process.env.NEXT_PUBLIC_CURRENT_WEEK || 'WK20'
+// Dynamically compute current ISO week from today's date
+function getCurrentIsoWeek(): string {
+  const now = new Date()
+  const day = now.getDay() === 0 ? 7 : now.getDay()
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - (day - 1))
+  monday.setHours(0, 0, 0, 0)
+  const yearStart = new Date(monday.getFullYear(), 0, 1)
+  const dayOfYear = Math.floor((monday.getTime() - yearStart.getTime()) / 86400000) + 1
+  const isoWeek = Math.ceil(dayOfYear / 7)
+  return `WK${isoWeek}`
+}
+const CURRENT_WK = getCurrentIsoWeek()
 
 export default function ProjectPage() {
   const params = useParams()
@@ -58,7 +70,7 @@ export default function ProjectPage() {
     }
 
     const { data: wkData } = await supabase
-      .from('week_calendar').select('*').gte('wk_label', CURRENT_WK).order('wk_in_year').limit(26)
+      .from('week_calendar').select('*').gte('monday_date', (() => { const now = new Date(); const day = now.getDay() === 0 ? 7 : now.getDay(); const mon = new Date(now); mon.setDate(now.getDate() - (day - 1)); return mon.toISOString().slice(0, 10); })()).order('wk_in_year').limit(26)
 
     const wkList: WeekInfo[] = (wkData || []).map((w: any) => ({
       label: w.wk_label, year: w.year, month: w.month, monthLabel: w.month_label,
