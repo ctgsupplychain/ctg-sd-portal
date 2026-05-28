@@ -19,19 +19,19 @@ import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { loadDemandForecast } from '@/lib/forecasting/forecast-lookup'
 import { RefreshCw, Download } from 'lucide-react'
 
-// Dynamically compute current ISO week from today's date
-function getCurrentIsoWeek(): string {
+// Get Monday date of current week (ISO: week starts Monday)
+function getCurrentMondayDate(): string {
   const now = new Date()
   const day = now.getDay() === 0 ? 7 : now.getDay()
   const monday = new Date(now)
   monday.setDate(now.getDate() - (day - 1))
-  monday.setHours(0, 0, 0, 0)
-  const yearStart = new Date(monday.getFullYear(), 0, 1)
-  const dayOfYear = Math.floor((monday.getTime() - yearStart.getTime()) / 86400000) + 1
-  const isoWeek = Math.ceil(dayOfYear / 7)
-  return `WK${isoWeek}`
+  const y = monday.getFullYear()
+  const m = String(monday.getMonth() + 1).padStart(2, '0')
+  const d = String(monday.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
-const CURRENT_WK = getCurrentIsoWeek()
+const CURRENT_MONDAY = getCurrentMondayDate()
+let CURRENT_WK = ''
 
 export default function ProjectPage() {
   const params = useParams()
@@ -70,12 +70,13 @@ export default function ProjectPage() {
     }
 
     const { data: wkData } = await supabase
-      .from('week_calendar').select('*').gte('monday_date', (() => { const now = new Date(); const day = now.getDay() === 0 ? 7 : now.getDay(); const mon = new Date(now); mon.setDate(now.getDate() - (day - 1)); return mon.toISOString().slice(0, 10); })()).order('wk_in_year').limit(26)
+      .from('week_calendar').select('*').gte('monday_date', CURRENT_MONDAY).order('monday_date').limit(26)
 
     const wkList: WeekInfo[] = (wkData || []).map((w: any) => ({
       label: w.wk_label, year: w.year, month: w.month, monthLabel: w.month_label,
       wkInYear: w.wk_in_year, wkInMonth: w.wk_in_month, mondayDate: w.monday_date, weeksInMonth: w.weeks_in_month,
     }))
+    if (wkList.length > 0) CURRENT_WK = wkList[0].label
     setWeeks(wkList)
 
     const { data: skuData } = await supabase.from('master_sku').select('*').eq('brand', brand).eq('status', 'Active')
