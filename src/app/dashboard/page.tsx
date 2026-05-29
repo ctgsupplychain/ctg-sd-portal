@@ -26,7 +26,7 @@ export default function DashboardPage() {
     if (!isAdmin) { router.push('/project/SkinDae'); return }
 
     const { data: skuData } = await supabase.from('master_sku').select('brand, sku, avg_selling_price, safety_stock, moq, lead_time_wk').eq('status', 'Active')
-    const uniqueBrands = [...new Set(skuData?.map((s: any) => s.brand) || [])] as string[]
+    const uniqueBrands = [...new Set(skuData?.map((s: any) => s.brand) || [])].sort((a, b) => (a as string).localeCompare(b as string)) as string[]
     setBrands(uniqueBrands)
 
     // Build summary per brand

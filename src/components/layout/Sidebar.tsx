@@ -51,6 +51,69 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
           </>
         )}
 
+        <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium mt-1">Tools</div>
+        {(userRole === 'buyer' || isAdmin) && (
+          <NavItem
+            icon={<FileInput size={15} />}
+            label="Supply Input"
+            href="/supply-input"
+            active={pathname === '/supply-input'}
+            onClick={() => router.push('/supply-input')}
+          />
+        )}
+        {userRole === 'supply_chain' && (
+          <NavItem
+            icon={<Package size={15} />}
+            label="Inventory Upload"
+            href="/inventory-upload"
+            active={pathname === '/inventory-upload'}
+            onClick={() => router.push('/inventory-upload')}
+          />
+        )}
+        {userRole === 'supply_chain' && (
+          <NavItem
+            icon={<TrendingUp size={15} />}
+            label="Sales History"
+            href="/sales-history-upload"
+            active={pathname === '/sales-history-upload'}
+            onClick={() => router.push('/sales-history-upload')}
+          />
+        )}
+        {userRole === 'supply_chain' && (
+          <NavItem
+            icon={<RefreshCw size={15} />}
+            label="Forecast Sync"
+            href="/forecast-sync"
+            active={pathname === '/forecast-sync'}
+            onClick={() => router.push('/forecast-sync')}
+          />
+        )}
+        {userRole === 'supply_chain' && (
+          <NavItem
+            icon={<Database size={15} />}
+            label="Master SKU"
+            href="/master-sku"
+            active={pathname.startsWith('/master-sku')}
+            onClick={() => router.push('/master-sku')}
+          />
+        )}
+        {userRole === 'supply_chain' && (
+          <NavItem
+            icon={<GitMerge size={15} />}
+            label="PLM"
+            href="/plm"
+            active={pathname.startsWith('/plm')}
+            onClick={() => router.push('/plm')}
+          />
+        )}
+        <NavItem
+          icon={<Bell size={15} />}
+          label="Alerts"
+          href="/alerts"
+          active={pathname === '/alerts'}
+          onClick={() => router.push('/alerts')}
+        />
+
         {brands.length > 0 && (
           <>
             <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium mt-1">My Projects</div>
@@ -66,69 +129,6 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
             ))}
           </>
         )}
-
-        <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium mt-1">Tools</div>
-{(userRole === 'buyer' || isAdmin) && (
-  <NavItem
-    icon={<FileInput size={15} />}
-    label="Supply Input"
-    href="/supply-input"
-    active={pathname === '/supply-input'}
-    onClick={() => router.push('/supply-input')}
-  />
-)}
-{userRole === 'supply_chain' && (
-  <NavItem
-    icon={<Package size={15} />}
-    label="Inventory Upload"
-    href="/inventory-upload"
-    active={pathname === '/inventory-upload'}
-    onClick={() => router.push('/inventory-upload')}
-  />
-)}
-{userRole === 'supply_chain' && (
-  <NavItem
-    icon={<TrendingUp size={15} />}
-    label="Sales History"
-    href="/sales-history-upload"
-    active={pathname === '/sales-history-upload'}
-    onClick={() => router.push('/sales-history-upload')}
-  />
-)}
-{userRole === 'supply_chain' && (
-  <NavItem
-    icon={<RefreshCw size={15} />}
-    label="Forecast Sync"
-    href="/forecast-sync"
-    active={pathname === '/forecast-sync'}
-    onClick={() => router.push('/forecast-sync')}
-  />
-)}
-        {userRole === 'supply_chain' && (
-  <NavItem
-    icon={<Database size={15} />}
-    label="Master SKU"
-    href="/master-sku"
-    active={pathname.startsWith('/master-sku')}
-    onClick={() => router.push('/master-sku')}
-  />
-)}
-        {userRole === 'supply_chain' && (
-  <NavItem
-    icon={<GitMerge size={15} />}
-    label="PLM"
-    href="/plm"
-    active={pathname.startsWith('/plm')}
-    onClick={() => router.push('/plm')}
-  />
-)}
-        <NavItem
-          icon={<Bell size={15} />}
-          label="Alerts"
-          href="/alerts"
-          active={pathname === '/alerts'}
-          onClick={() => router.push('/alerts')}
-        />
       </nav>
 
       {/* User footer */}
