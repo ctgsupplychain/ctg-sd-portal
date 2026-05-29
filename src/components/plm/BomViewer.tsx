@@ -8,11 +8,11 @@ import BomTable from './BomTable'
 import DocDrawer from './DocDrawer'
 import { AlertTriangle } from 'lucide-react'
 
-interface Props { fg: Part }
+interface Props { fg: Part; embedded?: boolean }
 
 const MOQ_OPTIONS = [5000, 6000, 10000, 18000]
 
-export default function BomViewer({ fg }: Props) {
+export default function BomViewer({ fg, embedded = false }: Props) {
   const [bomRows, setBomRows] = useState<BomRow[]>([])
   const [fgTiers, setFgTiers] = useState<PriceTier[]>([])
   const [docs, setDocs] = useState<Record<string, PlmDocument[]>>({})
@@ -36,7 +36,7 @@ export default function BomViewer({ fg }: Props) {
     const componentPns: string[] = explosion.map((r: BomRow) => r.component_pn)
     const [{ data: partsData }, { data: psData }, { data: docsData }] = await Promise.all([
       supabase.from('parts').select('part_number,current_revision,lifecycle_status,notes').in('part_number', componentPns),
-      supabase.from('part_supplier').select('part_number,supplier_id,is_preferred,moq,nre_cost,price_tiers,lead_time_wk').in('part_number', componentPns).eq('is_preferred', true),
+      supabase.from('manufacturer_parts').select('part_number,supplier_id,is_preferred,moq,nre_cost,price_tiers,lead_time_wk').in('part_number', componentPns).eq('is_preferred', true),
       supabase.from('plm_documents').select('*').in('part_number', componentPns),
     ])
 
@@ -62,7 +62,7 @@ export default function BomViewer({ fg }: Props) {
       docsMap[doc.part_number].push(doc)
     }
 
-    const { data: fgPs } = await supabase.from('part_supplier').select('price_tiers').eq('part_number', fg.part_number).eq('is_preferred', true).single()
+    const { data: fgPs } = await supabase.from('manufacturer_parts').select('price_tiers').eq('part_number', fg.part_number).eq('is_preferred', true).single()
     setFgTiers(fgPs?.price_tiers ?? [])
     setBomRows(merged)
     setDocs(docsMap)
@@ -84,7 +84,8 @@ export default function BomViewer({ fg }: Props) {
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#F0F2F5]">
 
-      {/* Page header — matches S&D header bar */}
+      {/* Page header — matches S&D header bar (hidden when embedded in tab) */}
+      {!embedded && (
       <div className="bg-white border-b border-[#EAECF0] px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-sm font-semibold text-[#101828] flex-shrink-0">BOM Viewer</h1>
@@ -94,8 +95,15 @@ export default function BomViewer({ fg }: Props) {
           <span className="text-sm text-[#344054] truncate font-medium">{fg.description}</span>
           <span className="text-xs text-[#667085] bg-[#F2F4F7] px-2 py-0.5 rounded font-mono flex-shrink-0">{fg.current_revision}</span>
         </div>
-        <span className="text-xs text-[#667085] flex-shrink-0">{fg.part_number} · {fg.lifecycle_status}</span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <a href={`/plm/${encodeURIComponent(fg.part_number)}`}
+            className="text-xs text-[#048A81] border border-[#048A81]/30 rounded-lg px-2.5 py-1 hover:bg-[#F0FDF9] transition-colors">
+            Open part detail ↗
+          </a>
+          <span className="text-xs text-[#667085]">{fg.part_number} · {fg.lifecycle_status}</span>
+        </div>
       </div>
+      )}
 
       {/* Metrics */}
       <MetricStrip

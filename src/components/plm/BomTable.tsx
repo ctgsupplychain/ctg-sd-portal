@@ -93,9 +93,14 @@ export default function BomTable({ rows, costMap, showL2, openPn, onToggle }: Pr
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1">
                     {isL2 && <span className="text-[#CBD5E1] text-xs ml-2">└</span>}
-                    <span className="text-xs font-mono text-[#048A81] border-b border-dashed border-[#048A81]/30">
+                    <a
+                      href={`/plm/${encodeURIComponent(row.component_pn)}`}
+                      onClick={e => e.stopPropagation()}
+                      className="text-xs font-mono text-[#048A81] border-b border-dashed border-[#048A81]/30 hover:border-solid hover:text-[#036b64]"
+                      title="Open part detail"
+                    >
                       {row.component_pn}
-                    </span>
+                    </a>
                   </div>
                 </td>
 

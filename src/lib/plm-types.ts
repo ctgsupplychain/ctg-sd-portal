@@ -1,10 +1,37 @@
 export type PartCategory = 'FG' | 'SA' | 'PK' | 'RM' | 'WIP'
 export type LifecycleStatus = 'Active' | 'NPI' | 'EOL' | 'Obsolete'
+export type MpnStatus = 'Active' | 'Alternate' | 'Qualifying' | 'Obsolete'
 
 export interface PriceTier {
   min_qty: number
   unit_price: number
   currency: string
+}
+
+export interface ManufacturerPart {
+  id: string
+  part_number: string
+  supplier_id: string | null
+  mpn: string | null
+  status: MpnStatus
+  is_preferred: boolean
+  moq: number | null
+  lead_time_wk: number | null
+  nre_cost: number | null
+  price_tiers: PriceTier[]
+  notes: string | null
+  // joined
+  supplier_name?: string | null
+  supplier_country?: string | null
+}
+
+export interface WhereUsedRow {
+  parent_pn: string
+  parent_desc: string
+  parent_category: PartCategory
+  qty_per: number
+  bom_level: number
+  is_fg: boolean
 }
 
 export interface Part {
