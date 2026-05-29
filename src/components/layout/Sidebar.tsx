@@ -2,7 +2,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import clsx from 'clsx'
-import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput, RefreshCw, Database, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput, RefreshCw, Database, TrendingUp, GitMerge } from 'lucide-react'
 
 interface SidebarProps {
   userEmail?: string
@@ -111,6 +111,15 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
     href="/master-sku"
     active={pathname.startsWith('/master-sku')}
     onClick={() => router.push('/master-sku')}
+  />
+)}
+        {userRole === 'supply_chain' && (
+  <NavItem
+    icon={<GitMerge size={15} />}
+    label="PLM"
+    href="/plm"
+    active={pathname.startsWith('/plm')}
+    onClick={() => router.push('/plm')}
   />
 )}
         <NavItem
