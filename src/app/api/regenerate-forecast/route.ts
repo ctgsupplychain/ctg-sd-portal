@@ -15,10 +15,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateForecast, dateToIsoWeek, addIsoWeeks } from '@/lib/forecasting/holt-winters'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,10 +28,10 @@ export async function POST(req: NextRequest) {
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authErr } = await getSupabase().auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
+    const { data: profile } = await getSupabase()
       .from('profiles').select('role').eq('id', user.id).single()
 
     if (!['admin', 'supply_chain'].includes(profile?.role ?? '')) {
@@ -45,11 +47,11 @@ export async function POST(req: NextRequest) {
     if (requestedSkus?.length) {
       targetSkus = requestedSkus
     } else if (brand) {
-      const { data } = await supabase
+      const { data } = await getSupabase()
         .from('sales_history').select('sku').eq('brand', brand)
       targetSkus = [...new Set((data ?? []).map((r: any) => r.sku))]
     } else {
-      const { data } = await supabase
+      const { data } = await getSupabase()
         .from('sales_history').select('sku')
       targetSkus = [...new Set((data ?? []).map((r: any) => r.sku))]
     }
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Load master SKU data for ASP + brand lookup ───────
-    const { data: masterSkus } = await supabase
+    const { data: masterSkus } = await getSupabase()
       .from('master_sku').select('sku, brand, avg_selling_price')
     const skuBrandMap = new Map((masterSkus ?? []).map((m: any) => [m.sku, m.brand]))
     const skuAspMap   = new Map((masterSkus ?? []).map((m: any) => [m.sku, Number(m.avg_selling_price ?? 0)]))
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
     for (const sku of targetSkus) {
       try {
         // Load full history with channel info
-        const { data: history } = await supabase
+        const { data: history } = await getSupabase()
           .from('sales_history')
           .select('iso_year, iso_week, qty, channel')
           .eq('sku', sku)
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest) {
         const startFrom = { isoYear: curIso.isoYear, isoWeek: curIso.isoWeek }
 
         // Load confirmed stockout weeks from weekly_atp_snapshot view
-        const { data: atpData } = await supabase
+        const { data: atpData } = await getSupabase()
           .from('weekly_atp_snapshot')
           .select('iso_year, iso_week, min_atp')
           .eq('sku', sku)
@@ -122,7 +124,7 @@ export async function POST(req: NextRequest) {
         let forecastPoints = result.points
 
         if (asp > 0 && skuBrand) {
-          const { data: gsheetRows } = await supabase
+          const { data: gsheetRows } = await getSupabase()
             .from('sales_forecast')
             .select('may_26, jun_26, jul_26, aug_26, sep_26, oct_26, nov_26, dec_26, jan_27, feb_27, mar_27, apr_27')
             .eq('brand', skuBrand)
@@ -164,7 +166,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Map week_start_date → wk_label ───────────────
-        const { data: wkCalendar } = await supabase
+        const { data: wkCalendar } = await getSupabase()
           .from('week_calendar')
           .select('wk_label, monday_date')
           .in('monday_date', forecastPoints.map(p => p.weekStartDate))
@@ -173,7 +175,7 @@ export async function POST(req: NextRequest) {
         const brand    = skuBrandMap.get(sku) ?? 'Unknown'
         const modelStr = asp > 0 ? `${result.model}_mgmt_seasonal` : result.model
 
-        await supabase.from('demand_forecast').upsert(
+        await getSupabase().from('demand_forecast').upsert(
           forecastPoints.map(p => ({
             sku, brand,
             iso_year:        p.isoYear,

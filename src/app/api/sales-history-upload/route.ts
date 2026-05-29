@@ -12,10 +12,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateForecast, dateToIsoWeek, addIsoWeeks } from '@/lib/forecasting/holt-winters'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 interface WeeklyRow {
   brand: string; company: string; sku: string; channel: string
@@ -28,10 +30,10 @@ export async function POST(req: NextRequest) {
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authErr } = await getSupabase().auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single()
     if (!['admin', 'supply_chain'].includes(profile?.role ?? '')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(rows) || rows.length === 0)
       return NextResponse.json({ error: 'No rows provided' }, { status: 400 })
 
-    const { data: masterSkus } = await supabase.from('master_sku').select('sku, brand, avg_selling_price')
+    const { data: masterSkus } = await getSupabase().from('master_sku').select('sku, brand, avg_selling_price')
     const masterSkuSet = new Set((masterSkus ?? []).map((m: any) => m.sku))
     const skuBrandMap  = new Map((masterSkus ?? []).map((m: any) => [m.sku, m.brand]))
 
@@ -69,7 +71,7 @@ export async function POST(req: NextRequest) {
       uploaded_at:     new Date().toISOString(),
     }))
 
-    const { error: upsertErr, count: upsertedCount } = await supabase
+    const { error: upsertErr, count: upsertedCount } = await getSupabase()
       .from('sales_history')
       .upsert(historyRecords, { onConflict: 'sku,channel,iso_year,iso_week', count: 'exact' })
 
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
     const forecastSummary: Record<string, { model: string; historyWeeks: number; cappedWeeks: number; mape?: number }> = {}
 
     for (const sku of affectedSkus) {
-      const { data: history } = await supabase
+      const { data: history } = await getSupabase()
         .from('sales_history').select('iso_year, iso_week, qty, channel').eq('sku', sku)
         .order('iso_year', { ascending: true }).order('iso_week', { ascending: true })
 
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
       const startFrom = { isoYear: _y, isoWeek: _w }
 
       // Load confirmed stockout weeks from weekly_atp_snapshot view
-      const { data: atpData } = await supabase
+      const { data: atpData } = await getSupabase()
         .from('weekly_atp_snapshot')
         .select('iso_year, iso_week, min_atp')
         .eq('sku', sku)
@@ -125,7 +127,7 @@ export async function POST(req: NextRequest) {
       if (skuAsp > 0) {
         const skuBrand = skuBrandMap.get(sku) ?? ''
 
-        const { data: gsheetRows } = await supabase
+        const { data: gsheetRows } = await getSupabase()
           .from('sales_forecast')
           .select('may_26, jun_26, jul_26, aug_26, sep_26, oct_26, nov_26, dec_26, jan_27, feb_27, mar_27, apr_27')
           .eq('brand', skuBrand)
@@ -171,13 +173,13 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const { data: wkCalendar } = await supabase.from('week_calendar')
+      const { data: wkCalendar } = await getSupabase().from('week_calendar')
         .select('wk_label, monday_date').in('monday_date', forecastPoints.map(p => p.weekStartDate))
 
       const calMap = new Map((wkCalendar ?? []).map((w: any) => [w.monday_date, w.wk_label]))
       const brand  = skuBrandMap.get(sku) ?? 'Unknown'
 
-      await supabase.from('demand_forecast').upsert(
+      await getSupabase().from('demand_forecast').upsert(
         forecastPoints.map(p => ({
           sku, brand,
           iso_year:        p.isoYear,

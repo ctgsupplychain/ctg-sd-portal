@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,10 +15,10 @@ export async function POST(req: NextRequest) {
     if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authError } = await getSupabase().auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'supply_chain') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const formData = await req.formData()
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!rows.length) return NextResponse.json({ error: 'No data found in file' }, { status: 400 })
 
     // Load existing SKUs for partial update logic
-    const { data: existingSkus } = await supabase.from('master_sku').select('sku')
+    const { data: existingSkus } = await getSupabase().from('master_sku').select('sku')
     const existingSkuSet = new Set(existingSkus?.map((s: any) => s.sku) || [])
 
     const toUpsert: any[] = []
@@ -88,14 +90,14 @@ const updateRecords = toUpsert.filter(r => updated.includes(r.sku))
 
 // Insert new SKUs
 if (newRecords.length > 0) {
-  const { error: insertErr } = await supabase.from('master_sku').insert(newRecords)
+  const { error: insertErr } = await getSupabase().from('master_sku').insert(newRecords)
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
 }
 
 // Update existing SKUs one by one (partial update — only changed fields)
 for (const rec of updateRecords) {
   const { sku, ...fields } = rec
-  const { error: updateErr } = await supabase
+  const { error: updateErr } = await getSupabase()
     .from('master_sku')
     .update(fields)
     .eq('sku', sku)

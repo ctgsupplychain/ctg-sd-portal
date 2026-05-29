@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Convert DD/MM/YYYY string to ISO date or null
 function parseDate(val: any): string | null {
@@ -52,10 +54,10 @@ export async function POST(req: NextRequest) {
     if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authError } = await getSupabase().auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'supply_chain') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     // Parse file
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
     if (!rows.length) return NextResponse.json({ error: 'No data in file' }, { status: 400 })
 
     // Load master_sku lead times for uncommit calculation
-    const { data: skuData } = await supabase.from('master_sku').select('sku, lead_time_wk')
+    const { data: skuData } = await getSupabase().from('master_sku').select('sku, lead_time_wk')
     const leadTimeMap: Record<string, number> = {}
     skuData?.forEach((s: any) => { leadTimeMap[s.sku] = s.lead_time_wk || 0 })
 
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
 
     // Check for unrecognized SKUs
     const uploadedSkus = [...new Set(mapped.map(r => r.sku))]
-    const { data: validSkus } = await supabase.from('master_sku').select('sku').in('sku', uploadedSkus)
+    const { data: validSkus } = await getSupabase().from('master_sku').select('sku').in('sku', uploadedSkus)
     const validSkuSet = new Set(validSkus?.map((s: any) => s.sku) || [])
     const invalidSkus = uploadedSkus.filter(s => !validSkuSet.has(s))
 
@@ -150,7 +152,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Upsert
-    const { error: upsertErr, count } = await supabase
+    const { error: upsertErr, count } = await getSupabase()
       .from('purchase_orders')
       .upsert(valid, { onConflict: 'po_number,sku', count: 'exact' })
 

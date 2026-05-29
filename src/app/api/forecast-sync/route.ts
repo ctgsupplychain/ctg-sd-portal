@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const SHEET_ID = '1ptI1gnMWdaxzYHQEVGjILgEpwqjCtDeYpj7hvY9R104'
 const SHEET_RANGE = 'Sheet1'
@@ -132,10 +134,10 @@ export async function POST(req: NextRequest) {
     if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authError } = await getSupabase().auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'supply_chain') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     // Get Google access token
@@ -146,7 +148,7 @@ export async function POST(req: NextRequest) {
     if (!rows.length) return NextResponse.json({ error: 'No data in sheet' }, { status: 400 })
 
     // Load projects
-    const { data: projects } = await supabase.from('projects').select('id, project_name')
+    const { data: projects } = await getSupabase().from('projects').select('id, project_name')
 
     const targetWk = getPreviousWk()
     const sheetProjects = [...new Set(rows.map(r => r['Project']?.trim()).filter(Boolean))]
@@ -167,7 +169,7 @@ export async function POST(req: NextRequest) {
       const wkStr = row['Week']?.trim() || targetWk
       const yearMatch = wkStr.match(/(\d{4})/); const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear()
 
-      const { error: upsertErr } = await supabase.from('sales_forecast').upsert({
+      const { error: upsertErr } = await getSupabase().from('sales_forecast').upsert({
         brand: row['Brand']?.trim(),
         project: projectName,
         project_id: projectRecord?.id || null,

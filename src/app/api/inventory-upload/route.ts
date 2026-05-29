@@ -4,10 +4,12 @@ import { createClient } from '@supabase/supabase-js'
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const SKU_BRAND_MAP: Record<string, string> = {
   SD: 'SkinDae',
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     // Parallel: auth check + body parse
     const [authResult, body] = await Promise.all([
-      supabase.auth.getUser(token),
+      getSupabase().auth.getUser(token),
       req.json().catch(() => null),
     ])
 
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await getSupabase()
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest) {
     const missingSkinDae = SKINDAE_SKUS.filter(s => !uploadedSkus.has(s))
 
     // Single Postgres function — one DB round trip for all rows
-    const { data: upsertCount, error: upsertError } = await supabase
+    const { data: upsertCount, error: upsertError } = await getSupabase()
       .rpc('bulk_upsert_wms_snapshots', { rows: deduped })
 
     if (upsertError) {
@@ -129,7 +131,7 @@ export async function POST(req: NextRequest) {
       .map((r: any) => ({ sku: r.sku, description: r.product_name_en }))
 
     if (descRows.length > 0) {
-      Promise.resolve(supabase.rpc('sync_wms_descriptions', { updates: descRows })).catch(() => {})
+      Promise.resolve(getSupabase().rpc('sync_wms_descriptions', { updates: descRows })).catch(() => {})
     }
 
     return NextResponse.json({
