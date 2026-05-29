@@ -14,58 +14,33 @@ interface Props {
 
 export default function MetricStrip({ totMat, totFreight, totTax, totLanded, freightPct, taxPct }: Props) {
   const metrics = [
-    {
-      label: 'Material Cost',
-      value: fmtMYR(totMat),
-      color: 'var(--accent)',
-      sub: 'components only',
-    },
-    {
-      label: 'Inbound Cost',
-      value: fmtMYR(totFreight),
-      color: freightPct > 0 ? 'var(--warn)' : 'var(--muted)',
-      sub: `${freightPct}% of material`,
-    },
-    {
-      label: 'Tax (SST)',
-      value: fmtMYR(totTax),
-      color: taxPct > 0 ? 'var(--text)' : 'var(--muted)',
-      sub: `${taxPct}% on landed`,
-    },
-    {
-      label: 'MVA',
-      value: 'RM 1.20',
-      color: 'var(--warn)',
-      sub: 'OEM assembly charge',
-    },
-    {
-      label: 'Total Landed Cost',
-      value: fmtMYR(totLanded + 1.20),
-      color: 'var(--text)',
-      sub: 'to us, per FG unit',
-    },
+    { label: 'Material Cost',     value: fmtMYR(totMat),          sub: 'components only',          accent: true },
+    { label: 'Inbound Cost',      value: fmtMYR(totFreight),       sub: `${freightPct}% of material`, accent: false },
+    { label: 'Tax (SST)',         value: fmtMYR(totTax),           sub: `${taxPct}% on landed`,      accent: false },
+    { label: 'MVA',               value: 'RM 1.20',                sub: 'OEM assembly charge',       accent: false, warn: true },
+    { label: 'Total Landed Cost', value: fmtMYR(totLanded + 1.20), sub: 'to us, per FG unit',       accent: false, bold: true },
   ]
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(5, 1fr)',
-      borderBottom: '1px solid var(--border)',
-      background: 'var(--bg1)',
-      flexShrink: 0,
-    }}>
+    <div className="grid border-b border-[#EAECF0] bg-white" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
       {metrics.map((m, i) => (
-        <div key={i} style={{
-          padding: '12px 18px',
-          borderRight: i < metrics.length - 1 ? '1px solid var(--border)' : 'none',
-        }}>
-          <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'monospace', marginBottom: 4 }}>
+        <div
+          key={i}
+          className="px-5 py-4"
+          style={{ borderRight: i < metrics.length - 1 ? '1px solid #EAECF0' : 'none' }}
+        >
+          <div className="text-[10px] font-medium text-[#667085] uppercase tracking-wider mb-1.5">
             {m.label}
           </div>
-          <div style={{ fontSize: 18, fontWeight: 600, fontFamily: 'monospace', color: m.color }}>
+          <div
+            className="text-xl font-semibold font-mono"
+            style={{
+              color: m.accent ? '#048A81' : m.warn ? '#d97706' : m.bold ? '#101828' : '#344054'
+            }}
+          >
             {m.value}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{m.sub}</div>
+          <div className="text-xs text-[#667085] mt-0.5">{m.sub}</div>
         </div>
       ))}
     </div>

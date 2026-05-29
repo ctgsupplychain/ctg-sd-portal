@@ -1,5 +1,8 @@
 'use client'
+import { useRouter } from 'next/navigation'
 import { Part } from '@/lib/plm-types'
+import { ArrowLeft } from 'lucide-react'
+import clsx from 'clsx'
 
 interface Props {
   parts: Part[]
@@ -9,20 +12,22 @@ interface Props {
 }
 
 const BRAND_COLORS: Record<string, string> = {
-  Naturelish: '#00d4a0',
-  Bonlife:    '#6c8cff',
-  Mejorecare: '#a78bfa',
+  Naturelish: '#048A81',
+  Bonlife:    '#6366f1',
+  Mejorecare: '#8b5cf6',
   KATA:       '#f59e0b',
-  iProcare:   '#34d399',
-  SwissMed:   '#0099ff',
-  GoHerb:     '#f5a623',
+  iProcare:   '#10b981',
+  SwissMed:   '#3b82f6',
+  GoHerb:     '#f97316',
 }
 
 function brandColor(brand: string | null): string {
-  return BRAND_COLORS[brand ?? ''] ?? '#7a8394'
+  return BRAND_COLORS[brand ?? ''] ?? '#667085'
 }
 
 export default function Sidebar({ parts, selected, onSelect, loading }: Props) {
+  const router = useRouter()
+
   const grouped = parts.reduce<Record<string, Part[]>>((acc, p) => {
     const key = p.brand ?? 'Other'
     acc[key] = acc[key] ?? []
@@ -31,128 +36,83 @@ export default function Sidebar({ parts, selected, onSelect, loading }: Props) {
   }, {})
 
   return (
-    <div style={{
-      width: 260,
-      background: 'var(--bg1)',
-      borderRight: '1px solid var(--border)',
-      display: 'flex',
-      flexDirection: 'column',
-      flexShrink: 0,
-    }}>
+    <div className="w-52 min-w-52 bg-[#1A2535] flex flex-col h-full">
       {/* Header */}
-      <div style={{
-        padding: '16px 16px 12px',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <div style={{
-            width: 30, height: 30,
-            background: '#1a1e25',
-            border: '1px solid var(--border2)',
-            borderRadius: 6,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: 'var(--accent)',
-            fontFamily: 'monospace',
-          }}>PLM</div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>CTG PLM</div>
-            <div style={{ fontSize: 10, color: 'var(--muted)' }}>Product Lifecycle Mgmt</div>
-          </div>
-        </div>
-        <div style={{
-          fontSize: 10,
-          fontFamily: 'monospace',
-          color: 'var(--muted)',
-          background: 'var(--bg2)',
-          border: '1px solid var(--border)',
-          borderRadius: 4,
-          padding: '5px 8px',
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-        }}>
-          BOM Viewer — Phase 1
-        </div>
+      <div className="px-4 py-5 border-b border-white/10">
+        <div className="text-white font-semibold text-sm tracking-wide">CTG PLM</div>
+        <div className="text-white/40 text-xs mt-0.5">Product Lifecycle Mgmt</div>
+      </div>
+
+      {/* Back to S&D */}
+      <div className="px-3 pt-3 pb-1">
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/50 hover:text-white hover:bg-white/8 transition-all text-xs font-medium border border-white/10 hover:border-white/20"
+        >
+          <ArrowLeft size={13} />
+          <span>Back to Portal</span>
+        </button>
+      </div>
+
+      {/* Section label */}
+      <div className="px-4 pt-3 pb-1 text-white/30 text-xs uppercase tracking-widest font-medium">
+        BOM Viewer
       </div>
 
       {/* SKU list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+      <div className="flex-1 overflow-y-auto">
         {loading && (
-          <div style={{ padding: '20px 16px', fontSize: 12, color: 'var(--muted)' }}>Loading…</div>
+          <div className="px-4 py-4 text-white/30 text-xs">Loading…</div>
         )}
         {Object.entries(grouped).map(([brand, brandParts]) => (
           <div key={brand}>
-            <div style={{
-              padding: '8px 16px 4px',
-              fontSize: 9,
-              fontFamily: 'monospace',
-              color: 'var(--muted)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              <span style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: brandColor(brand),
-                display: 'inline-block',
-              }} />
+            <div className="px-4 py-1.5 text-white/30 text-xs uppercase tracking-widest font-medium flex items-center gap-2">
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: brandColor(brand) }}
+              />
               {brand}
             </div>
             {brandParts.map(p => {
               const isSelected = selected?.part_number === p.part_number
               return (
-                <div
+                <button
                   key={p.part_number}
                   onClick={() => onSelect(p)}
-                  style={{
-                    padding: '8px 16px',
-                    cursor: 'pointer',
-                    background: isSelected ? 'rgba(0,212,160,0.08)' : 'transparent',
-                    borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent',
-                    transition: 'all 0.12s',
-                  }}
-                  onMouseEnter={e => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg2)'
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent'
-                  }}
-                >
-                  <div style={{
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    color: isSelected ? 'var(--accent)' : 'var(--accent2)',
-                    marginBottom: 2,
-                  }}>{p.part_number}</div>
-                  <div style={{
-                    fontSize: 12,
-                    color: isSelected ? 'var(--text)' : 'var(--muted)',
-                    lineHeight: 1.3,
-                  }}>{p.description}</div>
-                  {p.master_sku_ref && (
-                    <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--muted)', marginTop: 2 }}>
-                      {p.master_sku_ref}
-                    </div>
+                  className={clsx(
+                    'w-full text-left px-4 py-2 border-l-2 transition-all',
+                    isSelected
+                      ? 'bg-white/8 border-[#048A81]'
+                      : 'border-transparent hover:bg-white/5 hover:border-white/20'
                   )}
-                </div>
+                >
+                  <div className={clsx(
+                    'text-xs font-mono mb-0.5',
+                    isSelected ? 'text-[#048A81]' : 'text-white/40'
+                  )}>
+                    {p.part_number}
+                  </div>
+                  <div className={clsx(
+                    'text-xs leading-tight',
+                    isSelected ? 'text-white font-medium' : 'text-white/50'
+                  )}>
+                    {p.description}
+                  </div>
+                  {p.master_sku_ref && (
+                    <div className="text-white/25 text-xs font-mono mt-0.5">{p.master_sku_ref}</div>
+                  )}
+                </button>
               )
             })}
           </div>
         ))}
         {!loading && parts.length === 0 && (
-          <div style={{ padding: '20px 16px', fontSize: 12, color: 'var(--muted)' }}>
-            No active FG parts found.
-          </div>
+          <div className="px-4 py-4 text-white/30 text-xs">No active FG parts.</div>
         )}
       </div>
 
       {/* Footer */}
-      <div style={{
-        padding: '10px 16px',
-        borderTop: '1px solid var(--border)',
-        fontSize: 10,
-        fontFamily: 'monospace',
-        color: 'var(--muted)',
-      }}>
+      <div className="px-4 py-3 border-t border-white/10 text-white/25 text-xs">
         {parts.length} FG SKU{parts.length !== 1 ? 's' : ''} · ap-southeast-1
       </div>
     </div>

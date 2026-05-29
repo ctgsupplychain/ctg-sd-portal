@@ -1,6 +1,7 @@
 'use client'
 import { BomRow, PlmDocument, PriceTier } from '@/lib/plm-types'
 import { CostResult } from '@/lib/plm-types'
+import { X, Upload, FileText } from 'lucide-react'
 import { getTierPrice } from '@/lib/plm-cost'
 
 interface Props {
@@ -12,15 +13,24 @@ interface Props {
   onClose: () => void
 }
 
-const FILE_TYPE_STYLE: Record<string, { bg: string; color: string; border: string }> = {
-  pdf: { bg: 'rgba(255,95,95,.12)',   color: '#ff5f5f', border: 'rgba(255,95,95,.2)' },
-  ai:  { bg: 'rgba(245,166,35,.12)',  color: '#f5a623', border: 'rgba(245,166,35,.2)' },
-  dwg: { bg: 'rgba(0,153,255,.12)',   color: '#0099ff', border: 'rgba(0,153,255,.2)' },
-  png: { bg: 'rgba(52,211,153,.12)',  color: '#34d399', border: 'rgba(52,211,153,.2)' },
+const FILE_STYLE: Record<string, { bg: string; color: string }> = {
+  pdf: { bg: '#FEF2F2', color: '#dc2626' },
+  ai:  { bg: '#FFFBEB', color: '#d97706' },
+  dwg: { bg: '#EFF6FF', color: '#2563eb' },
+  png: { bg: '#F0FDF4', color: '#16a34a' },
 }
 
 function fileExt(name: string): string {
   return (name.split('.').pop() ?? 'file').toLowerCase()
+}
+
+function MetaRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between items-center py-1.5 border-b border-[#EAECF0] text-xs">
+      <span className="text-[#667085]">{k}</span>
+      <span className="font-mono text-[#344054]">{v}</span>
+    </div>
+  )
 }
 
 export default function DocDrawer({ pn, row, cost, docs, moq, onClose }: Props) {
@@ -29,195 +39,128 @@ export default function DocDrawer({ pn, row, cost, docs, moq, onClose }: Props) 
   const tiers: PriceTier[] = row.price_tiers ?? []
   const childOrderQty = cost?.child_order_qty ?? moq * row.qty_per_fg
   const activeTierIdx = cost?.active_tier_idx ?? 0
-
   const current = docs.filter(d => d.is_current)
   const archived = docs.filter(d => !d.is_current)
 
   return (
-    <div style={{
-      background: 'var(--bg1)',
-      borderTop: '1px solid var(--border)',
-      display: 'grid',
-      gridTemplateColumns: '260px 1fr',
-      gap: 0,
-      maxHeight: 360,
-      flexShrink: 0,
-    }}>
+    <div className="bg-white border-t border-[#EAECF0] grid flex-shrink-0"
+      style={{ gridTemplateColumns: '260px 1fr', maxHeight: 340 }}>
+
       {/* Left: part info */}
-      <div style={{
-        padding: '16px 18px',
-        borderRight: '1px solid var(--border)',
-        overflowY: 'auto',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+      <div className="p-4 border-r border-[#EAECF0] overflow-y-auto">
+        <div className="flex items-start justify-between mb-3">
           <div>
-            <div style={{ fontFamily: 'monospace', fontSize: 13, color: 'var(--accent2)' }}>{pn}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>{row.component_desc}</div>
+            <div className="text-sm font-mono font-semibold text-[#048A81]">{pn}</div>
+            <div className="text-xs text-[#667085] mt-0.5 leading-snug">{row.component_desc}</div>
           </div>
-          <button onClick={onClose} style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: 'var(--muted)', fontSize: 14, padding: '0 4px',
-          }}>✕</button>
+          <button onClick={onClose}
+            className="text-[#667085] hover:text-[#344054] transition-colors p-0.5 rounded hover:bg-[#F2F4F7]">
+            <X size={14} />
+          </button>
         </div>
 
-        <SectionTitle>Part info</SectionTitle>
-        <MetaRow k="Category" v={row.category} />
-        <MetaRow k="Revision" v={row.current_revision ?? '—'} />
-        <MetaRow k="Qty / FG" v={`${row.qty_per_fg} ${row.uom}`} />
-        <MetaRow k="Supplier" v={row.supplier_name ?? '—'} />
-        <MetaRow k="Lead time" v={row.lead_time_wk != null ? `${row.lead_time_wk}w` : '—'} />
-        <MetaRow k="MOQ" v={row.moq != null ? row.moq.toLocaleString() : '—'} />
-        {row.nre_cost != null && <MetaRow k="NRE" v={`RM ${row.nre_cost.toFixed(2)}`} />}
+        <div className="text-xs font-medium text-[#344054] uppercase tracking-wider mb-2">Part info</div>
+        <MetaRow k="Category"       v={row.category} />
+        <MetaRow k="Revision"       v={row.current_revision ?? '—'} />
+        <MetaRow k="Qty / FG"       v={`${row.qty_per_fg} ${row.uom}`} />
+        <MetaRow k="Supplier"       v={row.supplier_name ?? '—'} />
+        <MetaRow k="Lead time"      v={row.lead_time_wk != null ? `${row.lead_time_wk}w` : '—'} />
+        <MetaRow k="MOQ"            v={row.moq != null ? row.moq.toLocaleString() : '—'} />
         <MetaRow k="Child order qty" v={`${childOrderQty.toLocaleString()} ${row.uom}`} />
+        {row.nre_cost != null && <MetaRow k="NRE" v={`RM ${row.nre_cost.toFixed(2)}`} />}
 
         {tiers.length > 0 && (
-          <>
-            <SectionTitle style={{ marginTop: 12 }}>Price tiers</SectionTitle>
+          <div className="mt-3">
+            <div className="text-xs font-medium text-[#344054] uppercase tracking-wider mb-2">Price tiers</div>
             {tiers.map((t, i) => (
-              <div key={i} style={{
-                display: 'flex', justifyContent: 'space-between',
-                padding: '4px 0',
-                borderBottom: '1px solid var(--border)',
-                fontSize: 11,
-                color: i === activeTierIdx ? 'var(--accent)' : 'var(--muted)',
-              }}>
+              <div key={i}
+                className="flex justify-between py-1.5 border-b border-[#EAECF0] text-xs"
+                style={{ color: i === activeTierIdx ? '#048A81' : '#667085',
+                         fontWeight: i === activeTierIdx ? 500 : 400 }}>
                 <span>MOQ {t.min_qty.toLocaleString()}</span>
-                <span style={{ fontFamily: 'monospace' }}>
+                <span className="font-mono">
                   RM {t.unit_price.toFixed(5)}
-                  {i === activeTierIdx && (
-                    <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--accent)' }}>← active</span>
-                  )}
+                  {i === activeTierIdx && <span className="ml-1.5 text-[#048A81] text-xs">← active</span>}
                 </span>
               </div>
             ))}
-          </>
+          </div>
         )}
 
         {row.part_notes && (
-          <div style={{ marginTop: 10, fontSize: 10, color: 'var(--muted)', lineHeight: 1.5 }}>
+          <div className="mt-3 text-xs text-[#667085] leading-relaxed bg-[#F9FAFB] rounded-lg p-2.5">
             {row.part_notes}
           </div>
         )}
       </div>
 
       {/* Right: documents */}
-      <div style={{ padding: '16px 18px', overflowY: 'auto' }}>
-        <SectionTitle>
-          Documents {current.length > 0 ? `(${current.length} current${archived.length > 0 ? `, ${archived.length} archived` : ''})` : ''}
-        </SectionTitle>
+      <div className="p-4 overflow-y-auto">
+        <div className="text-xs font-medium text-[#344054] uppercase tracking-wider mb-3">
+          Documents
+          {current.length > 0 && (
+            <span className="ml-2 text-[#667085] normal-case font-normal">
+              {current.length} current{archived.length > 0 ? `, ${archived.length} archived` : ''}
+            </span>
+          )}
+        </div>
 
         {docs.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 6 }}>
-            <div style={{ fontSize: 28, opacity: 0.3 }}>📄</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>No documents attached yet</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Upload spec sheet, drawing, or artwork</div>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <FileText size={28} className="text-[#D0D5DD] mb-2" />
+            <div className="text-sm text-[#344054] font-medium">No documents attached</div>
+            <div className="text-xs text-[#667085] mt-0.5">Upload spec sheet, drawing or artwork</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 8 }}>
+          <div className="flex flex-col gap-2 mb-3">
             {current.map(doc => <DocRow key={doc.id} doc={doc} />)}
             {archived.length > 0 && (
               <>
-                <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 8 }}>
-                  Archived ({archived.length})
-                </div>
+                <div className="text-xs text-[#667085] uppercase tracking-wider pt-1">Archived</div>
                 {archived.map(doc => <DocRow key={doc.id} doc={doc} archived />)}
               </>
             )}
           </div>
         )}
 
-        {/* Upload zone */}
-        <div
-          onClick={() => alert('Upload — connect Supabase Storage bucket to enable file uploads')}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            padding: 9, marginTop: 10,
-            border: '1px dashed var(--border2)', borderRadius: 4,
-            fontSize: 11, color: 'var(--muted)', cursor: 'pointer',
-            transition: 'all .15s',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent2)'
-            ;(e.currentTarget as HTMLDivElement).style.color = 'var(--accent2)'
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border2)'
-            ;(e.currentTarget as HTMLDivElement).style.color = 'var(--muted)'
-          }}
+        <button
+          onClick={() => alert('Connect Supabase Storage to enable uploads')}
+          className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-[#D0D5DD] rounded-lg text-xs text-[#667085] hover:border-[#048A81] hover:text-[#048A81] transition-colors"
         >
-          ＋ Upload new version
-        </div>
+          <Upload size={13} />
+          Upload new version
+        </button>
       </div>
-    </div>
-  )
-}
-
-function SectionTitle({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={{
-      fontSize: 9, fontFamily: 'monospace', color: 'var(--muted)',
-      textTransform: 'uppercase', letterSpacing: '0.08em',
-      marginBottom: 6, ...style,
-    }}>
-      {children}
-    </div>
-  )
-}
-
-function MetaRow({ k, v }: { k: string; v: string }) {
-  return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between',
-      padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11,
-    }}>
-      <span style={{ color: 'var(--muted)' }}>{k}</span>
-      <span style={{ fontFamily: 'monospace', color: 'var(--text)' }}>{v}</span>
     </div>
   )
 }
 
 function DocRow({ doc, archived }: { doc: PlmDocument; archived?: boolean }) {
-  const ext = (doc.file_name.split('.').pop() ?? 'file').toLowerCase()
-  const style = FILE_TYPE_STYLE[ext] ?? { bg: 'var(--bg3)', color: 'var(--muted)', border: 'var(--border)' }
+  const ext = fileExt(doc.file_name)
+  const style = FILE_STYLE[ext] ?? { bg: '#F9FAFB', color: '#667085' }
 
   return (
     <div
       onClick={() => window.open(doc.file_url, '_blank')}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 9,
-        padding: '9px 11px',
-        background: 'var(--bg2)',
-        border: '1px solid var(--border)',
-        borderRadius: 4, cursor: 'pointer',
-        opacity: archived ? 0.5 : 1,
-        transition: 'border-color .15s',
-      }}
-      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border2)'}
-      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
+      className="flex items-center gap-3 p-3 bg-white border border-[#EAECF0] rounded-lg cursor-pointer hover:border-[#048A81]/40 hover:bg-[#F0FDF9] transition-all"
+      style={{ opacity: archived ? 0.5 : 1 }}
     >
-      <div style={{
-        width: 30, height: 30, borderRadius: 4, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 9, fontWeight: 700, fontFamily: 'monospace',
-        background: style.bg, color: style.color, border: `1px solid ${style.border}`,
-        textTransform: 'uppercase',
-      }}>
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold font-mono flex-shrink-0 uppercase"
+        style={{ background: style.bg, color: style.color }}>
         {ext}
       </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, color: 'var(--text)' }}>{doc.file_name}</div>
-        <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'monospace', marginTop: 1 }}>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm text-[#344054] truncate">{doc.file_name}</div>
+        <div className="text-xs text-[#667085] font-mono mt-0.5">
           v{doc.version} · {doc.doc_type} · {new Date(doc.uploaded_at).toLocaleDateString('en-MY')}
         </div>
       </div>
-      <span style={{
-        fontFamily: 'monospace', fontSize: 9, padding: '2px 5px', borderRadius: 2,
-        background: archived ? 'var(--bg3)' : 'rgba(0,212,160,.12)',
-        color: archived ? 'var(--muted)' : 'var(--accent)',
-      }}>
+      <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+        style={archived
+          ? { background: '#F2F4F7', color: '#667085' }
+          : { background: '#F0FDF9', color: '#048A81' }}>
         {archived ? 'Archived' : 'Current'}
       </span>
     </div>
   )
 }
-
