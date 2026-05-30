@@ -273,7 +273,7 @@ function AddMpnModal({ pn, onClose, onSaved }: {
                 className="w-full text-xs border border-[#D0D5DD] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#048A81]/30" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#344054] mb-1">Lead time (wk)[/label>
+              <label className="block text-xs font-medium text-[#344054] mb-1">Lead time (wk)</label>
               <input type="number" value={leadTimeWk} onChange={e => setLeadTimeWk(e.target.value)} placeholder="0"
                 className="w-full text-xs border border-[#D0D5DD] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#048A81]/30" />
             </div>
