@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { PlmDocument } from '@/lib/plm-types'
 import { Upload, FileText, Download, Loader2, X } from 'lucide-react'
 
-const DOC_TYPES = ['spec_sheet', 'drawing', 'test_report', 'cert', 'other'] as const
+const DOC_TYPES = ['spec_sheet', 'drawing', 'test_report', 'cert', 'rfq', 'other'] as const
 type DocType = typeof DOC_TYPES[number]
 
 const FILE_STYLE: Record<string, { bg: string; color: string }> = {
@@ -32,7 +32,7 @@ export default function TabDocuments({ pn }: { pn: string }) {
 
   useEffect(() => { fetchDocs() }, [pn])
 
-  if (loading) return <div className="text-sm text-[#667085] p-4">Loading documents…</div>
+  if (loading) return <div className="text-sm text-[#667085] p-4">Loading documents...</div>
 
   const current = docs.filter(d => d.is_current)
   const archived = docs.filter(d => !d.is_current)
@@ -80,7 +80,7 @@ export default function TabDocuments({ pn }: { pn: string }) {
   )
 }
 
-// ── Upload Modal ─────────────────────────────────────────────────────────────
+// -- Upload Modal -------------------------------------------------------------
 
 function UploadModal({ pn, onClose, onUploaded }: {
   pn: string
@@ -93,12 +93,12 @@ function UploadModal({ pn, onClose, onUploaded }: {
   const [version, setVersion] = useState('v1.0')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
 
   const handleSubmit = async () => {
     if (!file) return
     setUploading(true)
     setError(null)
-
     try {
       const supabase = createClient()
       const storagePath = `${pn}/${Date.now()}_${file.name}`
@@ -132,29 +132,69 @@ function UploadModal({ pn, onClose, onUploaded }: {
     }
   }
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const dropped = e.dataTransfer.files?.[0]
+    if (dropped) setFile(dropped)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#EAECF0]">
           <h3 className="text-sm font-semibold text-[#101828]">Upload Document</h3>
-          <button onClick={onClose} className="text-[#667085] hover:text-[#344054]"><X size={16} /></button>
+          <button onClick={onClose} className="text-[#667085] hover:text-[#344054]">
+            <X size={16} />
+          </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
+
+          {/* File picker -- click or drag-and-drop */}
           <div>
             <label className="block text-xs font-medium text-[#344054] mb-1">File</label>
             <div
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-[#D0D5DD] rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#048A81]/50 hover:bg-[#F0FDF9] transition-colors">
-              <Upload size={20} className="text-[#D0D5DD]" />
-              <span className="text-xs text-[#667085]">
-                {file ? file.name : 'Click to choose file (PDF, DWG, PNG, AI…)'}
-              </span>
+              onDragOver={e => { e.preventDefault(); setDragging(true) }}
+              onDragEnter={e => { e.preventDefault(); setDragging(true) }}
+              onDragLeave={e => { e.preventDefault(); setDragging(false) }}
+              onDrop={handleDrop}
+              className="border-2 border-dashed rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer transition-colors"
+              style={{
+                borderColor: dragging ? '#048A81' : file ? '#048A81' : '#D0D5DD',
+                background: dragging ? '#F0FDF9' : file ? '#F0FDF9' : 'transparent',
+              }}>
+              <Upload
+                size={20}
+                style={{ color: dragging || file ? '#048A81' : '#D0D5DD' }}
+              />
+              {file ? (
+                <div className="text-center">
+                  <div className="text-xs font-medium text-[#048A81]">{file.name}</div>
+                  <div className="text-[10px] text-[#667085] mt-0.5">
+                    {(file.size / 1024).toFixed(0)} KB &mdash; click to change
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div className="text-xs text-[#667085]">
+                    Drag &amp; drop or{' '}
+                    <span className="text-[#048A81] font-medium">click to choose</span>
+                  </div>
+                  <div className="text-[10px] text-[#667085] mt-0.5">PDF, DWG, PNG, AI...</div>
+                </div>
+              )}
             </div>
-            <input ref={fileRef} type="file" className="hidden"
-              onChange={e => setFile(e.target.files?.[0] ?? null)} />
+            <input
+              ref={fileRef}
+              type="file"
+              className="hidden"
+              onChange={e => setFile(e.target.files?.[0] ?? null)}
+            />
           </div>
 
+          {/* Doc type */}
           <div>
             <label className="block text-xs font-medium text-[#344054] mb-1">Document type</label>
             <select
@@ -162,11 +202,14 @@ function UploadModal({ pn, onClose, onUploaded }: {
               onChange={e => setDocType(e.target.value as DocType)}
               className="w-full text-xs border border-[#D0D5DD] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#048A81]/30">
               {DOC_TYPES.map(t => (
-                <option key={t} value={t}>{t.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                <option key={t} value={t}>
+                  {t.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                </option>
               ))}
             </select>
           </div>
 
+          {/* Version */}
           <div>
             <label className="block text-xs font-medium text-[#344054] mb-1">Version</label>
             <input
@@ -174,7 +217,8 @@ function UploadModal({ pn, onClose, onUploaded }: {
               value={version}
               onChange={e => setVersion(e.target.value)}
               placeholder="e.g. v1.0, Rev A"
-              className="w-full text-xs border border-[#D0D5DD] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#048A81]/30" />
+              className="w-full text-xs border border-[#D0D5DD] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#048A81]/30"
+            />
           </div>
 
           {error && (
@@ -183,13 +227,21 @@ function UploadModal({ pn, onClose, onUploaded }: {
         </div>
 
         <div className="flex gap-2 px-5 py-4 border-t border-[#EAECF0]">
-          <button onClick={onClose} disabled={uploading}
+          <button
+            onClick={onClose}
+            disabled={uploading}
             className="flex-1 text-xs border border-[#D0D5DD] rounded-lg py-2 text-[#344054] hover:bg-[#F9FAFB] transition-colors disabled:opacity-50">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={!file || uploading}
+          <button
+            onClick={handleSubmit}
+            disabled={!file || uploading}
             className="flex-1 text-xs bg-[#048A81] text-white rounded-lg py-2 flex items-center justify-center gap-1.5 hover:bg-[#037068] transition-colors disabled:opacity-50">
-            {uploading ? <><Loader2 size={13} className="animate-spin" /> Uploading…</> : 'Upload'}
+            {uploading ? (
+              <><Loader2 size={13} className="animate-spin" /> Uploading...</>
+            ) : (
+              'Upload'
+            )}
           </button>
         </div>
       </div>
@@ -197,7 +249,10 @@ function UploadModal({ pn, onClose, onUploaded }: {
   )
 }
 
-// ── Doc Row ──────────────────────────────────────────────────────────────────
+// -- Doc Row ------------------------------------------------------------------
+
+const ROW_CLS = 'flex items-center gap-3 p-3 bg-white border border-[#EAECF0] rounded-xl cursor-pointer transition-all'
+const ROW_HOVER = 'hover:border-[#048A81]/40 hover:bg-[#F0FDF9]'
 
 function DocRow({ doc, pn, archived }: { doc: PlmDocument; pn: string; archived?: boolean }) {
   const ext = (doc.file_name.split('.').pop() ?? 'file').toLowerCase()
@@ -218,18 +273,25 @@ function DocRow({ doc, pn, archived }: { doc: PlmDocument; pn: string; archived?
   return (
     <div
       onClick={openDoc}
-      className="flex items-center gap-3 p-3 bg-white border border-[#EAECF0] rounded-xl cursor-pointer hover:border-[#048A81]/40 hover:bg-[#F0FDF9] transition-all"
+      className={`${ROW_CLS} ${ROW_HOVER}`}
       style={{ opacity: archived ? 0.55 : 1 }}>
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-semibold font-mono uppercase flex-shrink-0"
-        style={{ background: style.bg, color: style.color }}>{ext}</div>
+      <div
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-semibold font-mono uppercase flex-shrink-0"
+        style={{ background: style.bg, color: style.color }}>
+        {ext}
+      </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm text-[#344054] truncate">{doc.file_name}</div>
         <div className="text-xs text-[#667085] font-mono mt-0.5">
-          v{doc.version} · {doc.doc_type} · {new Date(doc.uploaded_at).toLocaleDateString('en-MY')}
+          v{doc.version} &middot; {doc.doc_type} &middot;{' '}
+          {new Date(doc.uploaded_at).toLocaleDateString('en-MY')}
         </div>
       </div>
-      <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-        style={archived ? { background: '#F2F4F7', color: '#667085' } : { background: '#F0FDF9', color: '#048A81' }}>
+      <span
+        className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+        style={archived
+          ? { background: '#F2F4F7', color: '#667085' }
+          : { background: '#F0FDF9', color: '#048A81' }}>
         {archived ? 'Archived' : 'Current'}
       </span>
       <Download size={14} className="text-[#D0D5DD] flex-shrink-0" />
