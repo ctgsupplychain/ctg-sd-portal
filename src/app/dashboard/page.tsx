@@ -2,15 +2,53 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/layout/Sidebar'
-import { FLAG_DISPLAY } from '@/lib/sd-compute'
 import { useRouter } from 'next/navigation'
+
+// ── types ────────────────────────────────────────────────────────────────────
+
+interface SkuRow { sku: string; brand: string; avg_selling_price: number; safety_stock: number; lead_time_wk: number }
+
+interface BrandSummary {
+  brand: string
+  skuCount: number
+  onHandUnits: number
+  onHandValue: number
+  avgWeeklyDemand: number
+  daysOfCover: number | null
+  openPoUnits: number
+  hasLatePo: boolean
+  fcstAcc: number | null
+  status: 'Stockout' | 'Reorder' | 'Excess' | 'Healthy' | 'No data'
+  velocity: 'High' | 'Med' | 'Low'
+}
+
+interface ChartPoint { wk: string; projected: number; safetyStock: number; poLanding: boolean }
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function kpiCard(bg: string, tc: string, sc: string, border: string, label: string, val: string | number, hint: string) {
+  return { bg, tc, sc, border, label, val: String(val), hint }
+}
+
+// ── component ─────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const supabase = createClient()
   const router = useRouter()
+
   const [profile, setProfile] = useState<any>(null)
   const [brands, setBrands] = useState<string[]>([])
-  const [summary, setSummary] = useState<any[]>([])
+  const [brandSummary, setBrandSummary] = useState<BrandSummary[]>([])
+  const [kpis, setKpis] = useState<{
+    stockoutRisk: number
+    belowReorder: number
+    excessValue: number
+    latePos: number
+    openPoTotal: number
+    snapshotDate: string
+  } | null>(null)
+  const [coverageChart, setCoverageChart] = useState<ChartPoint[]>([])
+  const [chartBrand, setChartBrand] = useState('—')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { loadDashboard() }, [])
@@ -25,91 +63,350 @@ export default function DashboardPage() {
     const isAdmin = prof?.role === 'admin' || prof?.role === 'supply_chain'
     if (!isAdmin) { router.push('/project/SkinDae'); return }
 
-    const { data: skuData } = await supabase.from('master_sku').select('brand, sku, avg_selling_price, safety_stock, moq, lead_time_wk').eq('status', 'Active')
-    const uniqueBrands = [...new Set(skuData?.map((s: any) => s.brand) || [])].sort((a, b) => (a as string).localeCompare(b as string)) as string[]
+    const today = new Date().toISOString().split('T')[0]
+    const in84d = new Date(Date.now() + 84 * 86400000).toISOString().split('T')[0]
+    const ago84d = new Date(Date.now() - 84 * 86400000).toISOString().split('T')[0]
+
+    const [skuRes, wmsRes, poRes, forecastRes, salesRes] = await Promise.all([
+      supabase.from('master_sku')
+        .select('sku, brand, avg_selling_price, safety_stock, lead_time_wk')
+        .eq('status', 'Active'),
+      supabase.from('wms_inventory_snapshots')
+        .select('brand, usable, incoming, snapshot_date')
+        .order('snapshot_date', { ascending: false })
+        .limit(6000),
+      supabase.from('purchase_orders')
+        .select('brand, sku, qty, delivery_date, status, unit_price'),
+      supabase.from('demand_forecast')
+        .select('brand, sku, iso_year, iso_week, week_start_date, forecast_qty')
+        .gte('week_start_date', today)
+        .lte('week_start_date', in84d)
+        .order('week_start_date', { ascending: true }),
+      supabase.from('sales_history')
+        .select('brand, sku, iso_year, iso_week, qty')
+        .gte('week_start_date', ago84d),
+    ])
+
+    const skuData: SkuRow[] = skuRes.data || []
+    const wmsRaw = wmsRes.data || []
+    const poData = poRes.data || []
+    const forecastData = forecastRes.data || []
+    const salesData = salesRes.data || []
+
+    const uniqueBrands = [...new Set(skuData.map(s => s.brand))].sort((a, b) => a.localeCompare(b))
     setBrands(uniqueBrands)
 
-    // Build summary per brand
-    const { data: stockData } = await supabase.from('stock_snapshot').select('master_sku, usable_qty, report_date').order('report_date', { ascending: false })
-    const latestStock: Record<string, { qty: number, date: string }> = {}
-    stockData?.forEach((s: any) => { if (!latestStock[s.master_sku]) latestStock[s.master_sku] = { qty: s.usable_qty, date: s.report_date } })
+    const latestDate = wmsRaw[0]?.snapshot_date || '—'
+    const wmsLatest: Record<string, { onHand: number; incoming: number }> = {}
+    wmsRaw
+      .filter(r => r.snapshot_date === latestDate && r.brand && r.brand.trim())
+      .forEach(r => {
+        if (!wmsLatest[r.brand]) wmsLatest[r.brand] = { onHand: 0, incoming: 0 }
+        wmsLatest[r.brand].onHand += r.usable || 0
+        wmsLatest[r.brand].incoming += r.incoming || 0
+      })
 
-    const { data: supplyData } = await supabase.from('supply_input').select('sku, qty, status, receipt_wk')
-
-    const brandSummary = uniqueBrands.map(brand => {
-      const brandSkus = skuData?.filter((s: any) => s.brand === brand) || []
-      const totalOnHand = brandSkus.reduce((sum: number, s: any) => sum + (latestStock[s.sku]?.qty || 0), 0)
-      const openPOs = supplyData?.filter((s: any) => brandSkus.find((b: any) => b.sku === s.sku) && s.status === 'Commit').reduce((sum: number, s: any) => sum + s.qty, 0) || 0
-      const skuCount = brandSkus.length
-      return { brand, totalOnHand, openPOs, skuCount, stockDate: Object.values(latestStock)[0]?.date }
+    const brandForecast: Record<string, { byWeek: Record<string, number>; bySku: Record<string, number> }> = {}
+    forecastData.forEach(r => {
+      if (!brandForecast[r.brand]) brandForecast[r.brand] = { byWeek: {}, bySku: {} }
+      brandForecast[r.brand].byWeek[r.week_start_date] = (brandForecast[r.brand].byWeek[r.week_start_date] || 0) + r.forecast_qty
+      brandForecast[r.brand].bySku[r.sku] = (brandForecast[r.brand].bySku[r.sku] || 0) + r.forecast_qty
     })
-    setSummary(brandSummary)
+
+    const openPoByBrand: Record<string, number> = {}
+    let latePoCount = 0
+    let totalOpenPo = 0
+    poData.filter(p => p.status === 'Open').forEach(p => {
+      if (!p.brand) return
+      openPoByBrand[p.brand] = (openPoByBrand[p.brand] || 0) + (p.qty || 0)
+      totalOpenPo += p.qty || 0
+      if (p.delivery_date && p.delivery_date < today) latePoCount++
+    })
+
+    type MapeAcc = { errSum: number; count: number }
+    const brandMapeAcc: Record<string, MapeAcc> = {}
+    const forecastLookup: Record<string, number> = {}
+    forecastData.forEach(f => { forecastLookup[`${f.sku}-${f.iso_year}-${f.iso_week}`] = f.forecast_qty })
+    salesData.forEach(s => {
+      const fc = forecastLookup[`${s.sku}-${s.iso_year}-${s.iso_week}`]
+      if (fc != null && s.qty > 0) {
+        if (!brandMapeAcc[s.brand]) brandMapeAcc[s.brand] = { errSum: 0, count: 0 }
+        brandMapeAcc[s.brand].errSum += Math.abs(fc - s.qty) / s.qty
+        brandMapeAcc[s.brand].count++
+      }
+    })
+
+    let stockoutRisk = 0; let belowReorder = 0; let excessValue = 0
+
+    const summary: BrandSummary[] = uniqueBrands.map(brand => {
+      const brandSkus = skuData.filter(s => s.brand === brand)
+      const skuCount = brandSkus.length
+      const wms = wmsLatest[brand] || { onHand: 0, incoming: 0 }
+      const onHandUnits = wms.onHand
+      const avgAsp = brandSkus.length > 0 ? brandSkus.reduce((sum, s) => sum + (s.avg_selling_price || 0), 0) / brandSkus.length : 0
+      const onHandValue = onHandUnits * avgAsp
+      const fc = brandForecast[brand]
+      const weekCount = fc ? Object.keys(fc.byWeek).length : 0
+      const totalFcstDemand = fc ? Object.values(fc.byWeek).reduce((a, b) => a + b, 0) : 0
+      const avgWeeklyDemand = weekCount > 0 ? totalFcstDemand / weekCount : 0
+      const avgDailyDemand = avgWeeklyDemand / 7
+      const daysOfCover = avgDailyDemand > 0 ? Math.round(onHandUnits / avgDailyDemand) : null
+      const totalSafetyStock = brandSkus.reduce((sum, s) => sum + (s.safety_stock || 0), 0)
+      const openPoUnits = openPoByBrand[brand] || 0
+      const hasLatePo = poData.some(p => p.brand === brand && p.status === 'Open' && p.delivery_date && p.delivery_date < today)
+      if (avgWeeklyDemand > 0 && onHandUnits < avgWeeklyDemand * 2 && !openPoUnits) stockoutRisk++
+      if (onHandUnits < totalSafetyStock && !openPoUnits) belowReorder++
+      if (daysOfCover && daysOfCover > 90) excessValue += onHandValue
+      const mapeAcc = brandMapeAcc[brand]
+      const fcstAcc = mapeAcc && mapeAcc.count >= 3 ? Math.max(0, 100 - (mapeAcc.errSum / mapeAcc.count) * 100) : null
+      const velocity: 'High' | 'Med' | 'Low' = avgWeeklyDemand > 3000 ? 'High' : avgWeeklyDemand > 500 ? 'Med' : 'Low'
+      let status: BrandSummary['status']
+      if (avgWeeklyDemand > 0 && onHandUnits < avgWeeklyDemand * 2 && !openPoUnits) status = 'Stockout'
+      else if (onHandUnits < totalSafetyStock) status = 'Reorder'
+      else if (daysOfCover && daysOfCover > 90) status = 'Excess'
+      else if (avgWeeklyDemand === 0 && onHandUnits === 0) status = 'No data'
+      else status = 'Healthy'
+      return { brand, skuCount, onHandUnits, onHandValue, avgWeeklyDemand, daysOfCover, openPoUnits, hasLatePo, fcstAcc, status, velocity }
+    })
+
+    const statusOrder: Record<string, number> = { Stockout: 0, Reorder: 1, Excess: 2, Healthy: 3, 'No data': 4 }
+    summary.sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
+    setBrandSummary(summary)
+
+    const bestBrand = Object.entries(brandForecast).sort(([, a], [, b]) => Object.keys(b.byWeek).length - Object.keys(a.byWeek).length)[0]?.[0] || ''
+    setChartBrand(bestBrand)
+
+    if (bestBrand) {
+      const chartSkus = skuData.filter(s => s.brand === bestBrand)
+      const chartSafetyStock = chartSkus.reduce((sum, s) => sum + (s.safety_stock || 0), 0)
+      const chartPos = poData.filter(p => p.brand === bestBrand && p.status === 'Open')
+      let projected = wmsLatest[bestBrand]?.onHand || 0
+      const weeks = Object.keys(brandForecast[bestBrand]?.byWeek || {}).slice(0, 12)
+      const points: ChartPoint[] = weeks.map((wk, i) => {
+        const demand = brandForecast[bestBrand]?.byWeek[wk] || 0
+        const nextWk = new Date(new Date(wk).getTime() + 7 * 86400000).toISOString().split('T')[0]
+        const receipt = chartPos.filter(p => p.delivery_date && p.delivery_date >= wk && p.delivery_date < nextWk).reduce((sum, p) => sum + (p.qty || 0), 0)
+        projected = projected + receipt - demand
+        return { wk: `wk${i + 1}`, projected: Math.max(0, projected), safetyStock: chartSafetyStock, poLanding: receipt > 0 }
+      })
+      setCoverageChart(points)
+    }
+
+    setKpis({ stockoutRisk, belowReorder, excessValue: Math.round(excessValue), latePos: latePoCount, openPoTotal: totalOpenPo, snapshotDate: latestDate })
     setLoading(false)
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-[#F0F2F5]">
-      <Sidebar userEmail={profile?.email} userName={profile?.full_name} userRole={profile?.role} brands={brands} />
+  function CoverageChart() {
+    if (coverageChart.length === 0) {
+      return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, fontSize: 12, color: '#8B948F' }}>No forecast data available</div>
+    }
+    const maxVal = Math.max(...coverageChart.map(p => p.projected), coverageChart[0]?.safetyStock || 0) * 1.25 || 1
+    const W = 540; const H = 160; const PAD = 48
+    const xCoord = (i: number) => PAD + (i / Math.max(coverageChart.length - 1, 1)) * (W - PAD - 12)
+    const yCoord = (v: number) => 24 + (1 - v / maxVal) * (H - 40)
+    const safetyY = yCoord(coverageChart[0]?.safetyStock || 0)
+    const points = coverageChart.map((p, i) => `${xCoord(i)},${yCoord(p.projected)}`).join(' ')
+    const stockoutIdx = coverageChart.findIndex(p => p.projected <= (coverageChart[0]?.safetyStock || 0))
+    return (
+      <svg viewBox={`0 0 ${W} ${H + 18}`} style={{ width: '100%', height: 'auto' }}>
+        <line x1={PAD} y1={20} x2={PAD} y2={H} stroke="rgba(15,40,30,0.14)" strokeWidth="1"/>
+        <line x1={PAD} y1={H} x2={W - 8} y2={H} stroke="rgba(15,40,30,0.14)" strokeWidth="1"/>
+        {(coverageChart[0]?.safetyStock || 0) > 0 && (<>
+          <line x1={PAD} y1={safetyY} x2={W - 8} y2={safetyY} stroke="#E24B4A" strokeWidth="1" strokeDasharray="4 4"/>
+          <text x={PAD + 4} y={safetyY - 4} fontFamily="Inter,sans-serif" fontSize="9" fill="#A32D2D">safety stock</text>
+        </>)}
+        <polyline points={points} fill="none" stroke="#1D9E75" strokeWidth="2.4"/>
+        {coverageChart.map((p, i) => p.poLanding && (
+          <g key={`po-${i}`}>
+            <circle cx={xCoord(i)} cy={yCoord(p.projected)} r="4" fill="#0F6E56"/>
+            <text x={xCoord(i) - 10} y={yCoord(p.projected) - 7} fontFamily="Inter,sans-serif" fontSize="9" fill="#0F6E56">PO</text>
+          </g>
+        ))}
+        {stockoutIdx > 0 && (
+          <g>
+            <circle cx={xCoord(stockoutIdx)} cy={yCoord(coverageChart[stockoutIdx].projected)} r="4" fill="#E24B4A"/>
+            <text x={xCoord(stockoutIdx) - 20} y={H + 13} fontFamily="Inter,sans-serif" fontSize="9" fill="#A32D2D">alert {coverageChart[stockoutIdx].wk}</text>
+          </g>
+        )}
+        <text x={PAD} y={H + 13} fontFamily="Inter,sans-serif" fontSize="9" fill="#8B948F">wk1</text>
+        <text x={W - 22} y={H + 13} fontFamily="Inter,sans-serif" fontSize="9" fill="#8B948F">wk12</text>
+        <text x={PAD - 4} y={22} fontFamily="Inter,sans-serif" fontSize="9" fill="#8B948F" textAnchor="end">units</text>
+      </svg>
+    )
+  }
 
+  function AccBar({ name, pct }: { name: string; pct: number | null }) {
+    const color = pct == null ? '#8B948F' : pct >= 85 ? '#1D9E75' : pct >= 70 ? '#EF9F27' : '#E24B4A'
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <span style={{ fontSize: 12, color: '#5C6862', width: 96, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        <div style={{ flex: 1, height: 7, background: 'rgba(15,40,30,0.07)', borderRadius: 5, overflow: 'hidden' }}>
+          {pct != null && <div style={{ width: `${Math.min(pct, 100)}%`, height: 7, background: color, borderRadius: 5 }}/>}
+        </div>
+        <span style={{ fontSize: 11, color: '#5C6862', width: 36, textAlign: 'right', fontFamily: 'monospace' }}>
+          {pct != null ? `${Math.round(pct)}%` : '—'}
+        </span>
+      </div>
+    )
+  }
+
+  const tiles = kpis ? [
+    { label: 'Stockout risk', val: kpis.stockoutRisk, hint: 'SKUs < 2 wks cover, no PO', cls: kpis.stockoutRisk > 0 ? 'red' : 'neutral' },
+    { label: 'Below reorder pt', val: kpis.belowReorder, hint: 'SKUs under safety stock', cls: kpis.belowReorder > 0 ? 'amber' : 'neutral' },
+    { label: 'Excess / aged', val: kpis.excessValue > 0 ? `RM ${(kpis.excessValue / 1000).toFixed(1)}k` : '—', hint: '>90 days cover (value)', cls: kpis.excessValue > 0 ? 'amber' : 'neutral' },
+    { label: 'Late POs', val: kpis.latePos, hint: 'past expected receipt', cls: kpis.latePos > 0 ? 'red' : 'neutral' },
+    { label: 'Open PO units', val: kpis.openPoTotal.toLocaleString(), hint: 'committed inbound supply', cls: 'neutral' },
+    { label: 'Active brands', val: brandSummary.filter(b => b.status !== 'No data').length, hint: `of ${brands.length} in master_sku`, cls: 'neutral' },
+  ] : []
+
+  return (
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F4F6F5', fontFamily: "'Inter', sans-serif" }}>
+      <Sidebar userEmail={profile?.email} userName={profile?.full_name} userRole={profile?.role} brands={brands} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-[#EAECF0] px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold text-[#101828]">Dashboard</h1>
-            <span className="bg-[#F2F4F7] text-[#667085] text-xs px-2.5 py-1 rounded-full">All Brands</span>
+        <div style={{ background: '#fff', borderBottom: '0.5px solid rgba(15,40,30,0.09)', padding: '10px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#16201C', letterSpacing: '-0.01em' }}>Inventory control tower</div>
+            <div style={{ fontSize: 11.5, color: '#8B948F', marginTop: 1 }}>
+              {loading ? 'Loading…' : `WMS snapshot ${kpis?.snapshotDate ?? '—'} · demand from statistical forecast`}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span style={{ fontSize: 12, color: '#5C6862', background: '#fff', border: '0.5px solid rgba(15,40,30,0.16)', borderRadius: 8, padding: '5px 13px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }}/>All brands
+            </span>
+            <span style={{ fontSize: 12, color: '#5C6862', background: '#fff', border: '0.5px solid rgba(15,40,30,0.16)', borderRadius: 8, padding: '5px 13px' }}>Next 12 weeks</span>
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto" style={{ padding: '20px 24px 48px' }}>
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-sm text-[#667085]">Loading...</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#8B948F', fontSize: 13 }}>Loading…</div>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                  <div className="text-xs text-[#667085] mb-1">Active Brands</div>
-                  <div className="text-2xl font-semibold text-[#101828]">{brands.length}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 14 }}>
+                {tiles.map(t => {
+                  const bg = t.cls === 'red' ? '#FBEAEA' : t.cls === 'amber' ? '#FBEFD9' : '#fff'
+                  const tc = t.cls === 'red' ? '#A32D2D' : t.cls === 'amber' ? '#85530B' : '#16201C'
+                  const sc = t.cls === 'red' ? '#A32D2D' : t.cls === 'amber' ? '#85530B' : '#8B948F'
+                  const bdr = t.cls === 'neutral' ? '0.5px solid rgba(15,40,30,0.09)' : 'none'
+                  return (
+                    <div key={t.label} style={{ background: bg, border: bdr, borderRadius: 10, padding: '12px 13px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: tc }}>{t.label}</div>
+                      <div style={{ fontSize: 24, fontWeight: 500, color: tc, margin: '2px 0 1px', letterSpacing: '-0.02em', fontFamily: 'monospace' }}>{t.val}</div>
+                      <div style={{ fontSize: 10.5, color: sc }}>{t.hint}</div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div style={{ background: '#fff', border: '0.5px solid rgba(15,40,30,0.09)', borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: '#16201C' }}>Projected inventory coverage</span>
+                    <span style={{ fontSize: 11, color: '#8B948F' }}>{chartBrand} · on-hand + receipts − demand</span>
+                  </div>
+                  <CoverageChart />
                 </div>
-                <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                  <div className="text-xs text-[#667085] mb-1">Total Active SKUs</div>
-                  <div className="text-2xl font-semibold text-[#101828]">{summary.reduce((a, b) => a + b.skuCount, 0)}</div>
-                </div>
-                <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                  <div className="text-xs text-[#667085] mb-1">Open POs (Commit)</div>
-                  <div className="text-2xl font-semibold text-[#101828]">{summary.reduce((a, b) => a + b.openPOs, 0).toLocaleString()}</div>
+                <div style={{ background: '#fff', border: '0.5px solid rgba(15,40,30,0.09)', borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#16201C', marginBottom: 10 }}>Replenishment queue</div>
+                  {brandSummary.filter(b => ['Stockout', 'Reorder', 'Excess'].includes(b.status)).length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#8B948F', paddingTop: 8 }}>No immediate reorder actions flagged.</div>
+                  ) : (
+                    brandSummary.filter(b => ['Stockout', 'Reorder', 'Excess'].includes(b.status)).slice(0, 7).map((b, i) => {
+                      const tagBg = b.status === 'Stockout' ? '#FBEAEA' : b.status === 'Reorder' ? '#FBEFD9' : 'rgba(15,40,30,0.05)'
+                      const tagTc = b.status === 'Stockout' ? '#A32D2D' : b.status === 'Reorder' ? '#85530B' : '#5C6862'
+                      const action = b.status === 'Stockout' ? 'reorder now' : b.status === 'Reorder' ? 'reorder soon' : 'monitor excess'
+                      return (
+                        <div key={b.brand} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderTop: i === 0 ? 'none' : '0.5px solid rgba(15,40,30,0.09)', fontSize: 13, color: '#16201C' }}>
+                          <span>{b.brand} · {b.skuCount} SKU{b.skuCount !== 1 ? 's' : ''}</span>
+                          <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 9px', borderRadius: 7, background: tagBg, color: tagTc }}>{action}</span>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
               </div>
-
-              <div className="bg-white rounded-xl border border-[#EAECF0] overflow-hidden">
-                <div className="px-5 py-4 border-b border-[#EAECF0]">
-                  <h2 className="text-sm font-semibold text-[#344054]">Brand Summary</h2>
+              <div style={{ background: '#fff', border: '0.5px solid rgba(15,40,30,0.09)', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+                <div style={{ padding: '12px 16px', borderBottom: '0.5px solid rgba(15,40,30,0.09)', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: '#16201C' }}>Brand health</span>
+                  <span style={{ fontSize: 11, color: '#8B948F' }}>sorted by risk · click "View S&D" for SKU detail</span>
                 </div>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#F9FAFB] border-b border-[#EAECF0]">
-                      {['Brand','SKUs','Total On-Hand','Open PO (Commit)','Action'].map(h => (
-                        <th key={h} className="px-5 py-3 text-left text-xs font-medium text-[#667085]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.map((row, i) => (
-                      <tr key={row.brand} className={i % 2 === 0 ? 'bg-white' : 'bg-[#F9FAFB]'}>
-                        <td className="px-5 py-3 font-medium text-[#101828]">{row.brand}</td>
-                        <td className="px-5 py-3 text-[#667085]">{row.skuCount}</td>
-                        <td className="px-5 py-3 text-[#344054]">{row.totalOnHand.toLocaleString()}</td>
-                        <td className="px-5 py-3 text-[#1849A9] font-medium">{row.openPOs.toLocaleString()}</td>
-                        <td className="px-5 py-3">
-                          <button
-                            onClick={() => router.push(`/project/${encodeURIComponent(row.brand)}`)}
-                            className="text-xs text-[#048A81] font-medium hover:underline"
-                          >
-                            View S&D →
-                          </button>
-                        </td>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(15,40,30,0.025)' }}>
+                        {['Brand', 'SKUs', 'On-hand', 'Days cover', 'Velocity', 'Fcst acc', 'Open PO', 'Status', ''].map(h => (
+                          <th key={h} style={{ fontSize: 11, fontWeight: 500, color: '#8B948F', padding: '7px 14px', textAlign: h === 'Brand' || h === '' ? 'left' : 'right', borderBottom: '0.5px solid rgba(15,40,30,0.09)', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
                       </tr>
+                    </thead>
+                    <tbody>
+                      {brandSummary.map((row, i) => {
+                        const statusStyle = row.status === 'Stockout' ? { background: '#FBEAEA', color: '#A32D2D' } : row.status === 'Reorder' ? { background: '#FBEFD9', color: '#85530B' } : row.status === 'Excess' ? { background: '#FBEFD9', color: '#85530B' } : row.status === 'Healthy' ? { background: '#E4F4EE', color: '#0F6E56' } : { background: 'rgba(15,40,30,0.05)', color: '#5C6862' }
+                        return (
+                          <tr key={row.brand} style={{ background: i % 2 === 0 ? '#fff' : 'rgba(15,40,30,0.013)' }}>
+                            <td style={{ padding: '9px 14px', fontWeight: 500, color: '#16201C', whiteSpace: 'nowrap' }}>{row.brand}</td>
+                            <td style={{ padding: '9px 14px', color: '#5C6862', textAlign: 'right' }}>{row.skuCount}</td>
+                            <td style={{ padding: '9px 14px', color: '#344054', textAlign: 'right', fontFamily: 'monospace' }}>{row.onHandUnits > 0 ? row.onHandUnits.toLocaleString() : '—'}</td>
+                            <td style={{ padding: '9px 14px', color: '#344054', textAlign: 'right', fontFamily: 'monospace' }}>{row.daysOfCover != null ? `${row.daysOfCover} d` : '—'}</td>
+                            <td style={{ padding: '9px 14px', color: '#5C6862', textAlign: 'right' }}>{row.avgWeeklyDemand > 0 ? row.velocity : '—'}</td>
+                            <td style={{ padding: '9px 14px', color: '#344054', textAlign: 'right', fontFamily: 'monospace' }}>{row.fcstAcc != null ? `${Math.round(row.fcstAcc)}%` : '—'}</td>
+                            <td style={{ padding: '9px 14px', color: '#1849A9', fontWeight: 500, textAlign: 'right', fontFamily: 'monospace' }}>{row.openPoUnits > 0 ? row.openPoUnits.toLocaleString() : '—'}</td>
+                            <td style={{ padding: '9px 14px', textAlign: 'right' }}>
+                              <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 9px', borderRadius: 7, ...statusStyle }}>{row.status}</span>
+                            </td>
+                            <td style={{ padding: '9px 14px' }}>
+                              <button onClick={() => router.push(`/project/${encodeURIComponent(row.brand)}`)} style={{ fontSize: 11.5, color: '#048A81', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>View S&D →</button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ background: '#fff', border: '0.5px solid rgba(15,40,30,0.09)', borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: '#16201C' }}>Forecast accuracy</span>
+                    <span style={{ fontSize: 11, color: '#8B948F' }}>100 − MAPE by brand</span>
+                  </div>
+                  {brandSummary.filter(b => b.fcstAcc != null).length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#8B948F', lineHeight: 1.7 }}>
+                      Insufficient actuals vs. forecast overlap (need ≥ 3 matching SKU-weeks).<br/>
+                      Will populate as historical data accumulates.
+                    </div>
+                  ) : (
+                    brandSummary.filter(b => b.fcstAcc != null).sort((a, b) => (b.fcstAcc ?? 0) - (a.fcstAcc ?? 0)).map(b => <AccBar key={b.brand} name={b.brand} pct={b.fcstAcc} />)
+                  )}
+                  <div style={{ display: 'flex', gap: 12, fontSize: 10.5, color: '#8B948F', marginTop: 10, flexWrap: 'wrap' }}>
+                    {[['#1D9E75', '≥85% trusted'], ['#EF9F27', '70–85% buffer'], ['#E24B4A', '<70% override']].map(([c, l]) => (
+                      <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <i style={{ width: 9, height: 2, background: c, display: 'inline-block', borderRadius: 2 }}/>{l}
+                      </span>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
+                <div style={{ background: '#fff', border: '0.5px solid rgba(15,40,30,0.09)', borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: '#16201C' }}>Inventory aging</span>
+                    <span style={{ fontSize: 11, color: '#8B948F' }}>days to expiry</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#8B948F', lineHeight: 1.7 }}>
+                    Expiry / lot data not yet captured in WMS upload.<br/>
+                    Pending confirmation per design brief §9 open decisions.<br/>
+                    <span style={{ color: '#85530B' }}>Interim:</span> age-from-receipt buckets will populate once lot tracking is active.
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: 72, padding: '12px 6px 0', opacity: 0.25 }}>
+                    {[{ h: 62, c: '#9FE1CB', lbl: '>180d' }, { h: 42, c: '#FAC775', lbl: '90–180' }, { h: 24, c: '#EF9F27', lbl: '30–90' }, { h: 10, c: '#E24B4A', lbl: '<30d' }].map(b => (
+                      <div key={b.lbl} style={{ flex: 1, textAlign: 'center' }}>
+                        <div style={{ height: b.h, background: b.c, borderRadius: '4px 4px 0 0' }}/>
+                        <div style={{ fontSize: 10, color: '#5C6862', marginTop: 4 }}>{b.lbl}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 11.5, color: '#8B948F', marginTop: 22, textAlign: 'center' }}>
+                On-hand from WMS snapshot ({kpis?.snapshotDate}) · Demand from Holt-Winters forecast · Open POs from purchase order register · Days cover = on-hand ÷ avg daily demand
               </div>
             </>
           )}
