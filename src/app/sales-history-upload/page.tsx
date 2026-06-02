@@ -14,7 +14,8 @@ interface ForecastSummaryItem {
   mape?: number
 }
 
-interface UploadResult {
+// Shape returned by /api/sales-history-upload (no forecast — done separately)
+interface UploadApiResult {
   success: boolean
   channel: Channel
   parseStats: {
@@ -28,12 +29,17 @@ interface UploadResult {
     weeklyRowsProcessed: number
     upserted: number
   }
+  skusToRegenerate: string[]
+  warnings: {
+    unknownSkus: string[]
+  }
+}
+
+// Shape used for display (forecast merged in after regenerate call)
+interface UploadResult extends UploadApiResult {
   forecast: {
     skusUpdated: number
     summary: Record<string, ForecastSummaryItem>
-  }
-  warnings: {
-    unknownSkus: string[]
   }
 }
 
@@ -60,8 +66,9 @@ export default function SalesHistoryUploadPage() {
   const [b2cFile, setB2cFile] = useState<File | null>(null)
   const [draggingB2b, setDraggingB2b] = useState(false)
   const [draggingB2c, setDraggingB2c] = useState(false)
-  const [loading,       setLoading]       = useState(false)
-  const [regenerating,  setRegenerating]  = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [loadingStage, setLoadingStage] = useState<'uploading' | 'forecasting' | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
   const [results, setResults] = useState<UploadResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showSkipped, setShowSkipped] = useState(false)
@@ -80,8 +87,6 @@ export default function SalesHistoryUploadPage() {
     }
   }, [])
 
-  // Parse XLS/XLSX in the browser and roll up to weekly totals.
-  // Returns a compact JSON payload (few KB) instead of posting the raw 5MB file.
   async function parseFileToWeeklyRows(file: File, channel: Channel): Promise<any[]> {
     const XLSX = await import('xlsx')
     const buffer = await file.arrayBuffer()
@@ -94,7 +99,6 @@ export default function SalesHistoryUploadPage() {
     ])
     const WMS_TO_MASTER: Record<string, string> = {
       'SDSDPM01': 'SDSDPM01S',
-      // SDSDCA05 and SDSDSB01S are now the master SKUs — no mapping needed
     }
 
     function parseWmsDate(raw: any): Date | null {
@@ -117,7 +121,6 @@ export default function SalesHistoryUploadPage() {
       const jan1 = new Date(Date.UTC(thu.getUTCFullYear(), 0, 1))
       const isoWeek = Math.ceil(((thu.getTime() - jan1.getTime()) / 86400000 + 1) / 7)
       const isoYear = thu.getUTCFullYear()
-      // Monday of that week
       const dow = d.getUTCDay() || 7
       const monday = new Date(d)
       monday.setUTCDate(d.getUTCDate() - (dow - 1))
@@ -171,9 +174,7 @@ export default function SalesHistoryUploadPage() {
     }))
   }
 
-  async function uploadFile(file: File, channel: Channel, token: string): Promise<UploadResult> {
-    // Parse file client-side → POST compact JSON (few KB vs 5MB raw file)
-    // This bypasses Vercel's hard 4.5MB route handler body limit
+  async function uploadFile(file: File, channel: Channel, token: string): Promise<UploadApiResult> {
     const weeklyRows = await parseFileToWeeklyRows(file, channel)
 
     const res = await fetch('/api/sales-history-upload', {
@@ -208,7 +209,7 @@ export default function SalesHistoryUploadPage() {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}),  // regenerate all SKUs in sales_history
+        body: JSON.stringify({}),
       })
 
       const json = await res.json()
@@ -219,6 +220,7 @@ export default function SalesHistoryUploadPage() {
         channel: 'B2C' as const,
         parseStats: { totalLineItems: 0, validLineItems: 0, skippedLineItems: 0, skippedStatuses: {}, dateRange: null },
         salesHistory: { weeklyRowsProcessed: 0, upserted: 0 },
+        skusToRegenerate: [],
         forecast: { skusUpdated: json.skusUpdated, summary: json.summary },
         warnings: { unknownSkus: [] },
       }])
@@ -233,6 +235,7 @@ export default function SalesHistoryUploadPage() {
     if (!b2bFile && !b2cFile) return
 
     setLoading(true)
+    setLoadingStage('uploading')
     setError(null)
     setResults([])
 
@@ -240,37 +243,58 @@ export default function SalesHistoryUploadPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
 
-      const uploads: Promise<UploadResult>[] = []
+      // Step 1: Upload history only (fast — no forecast computation)
+      const uploads: Promise<UploadApiResult>[] = []
       if (b2bFile) uploads.push(uploadFile(b2bFile, 'B2B', session.access_token))
       if (b2cFile) uploads.push(uploadFile(b2cFile, 'B2C', session.access_token))
 
-      const uploadResults = await Promise.all(uploads)
-      setResults(uploadResults)
+      const uploadApiResults = await Promise.all(uploads)
+
+      // Step 2: Regenerate forecasts for all affected SKUs (separate request)
+      setLoadingStage('forecasting')
+      const allSkus = [...new Set(uploadApiResults.flatMap(r => r.skusToRegenerate))]
+
+      let forecastSkusUpdated = 0
+      let forecastSummary: Record<string, ForecastSummaryItem> = {}
+
+      if (allSkus.length > 0) {
+        const regenRes = await fetch('/api/regenerate-forecast', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ skus: allSkus }),
+        })
+        const regenJson = await regenRes.json()
+        if (!regenRes.ok) throw new Error(regenJson.error ?? 'Forecast regeneration failed')
+        forecastSkusUpdated = regenJson.skusUpdated ?? 0
+        forecastSummary = regenJson.summary ?? {}
+      }
+
+      setResults(uploadApiResults.map(r => ({
+        ...r,
+        forecast: { skusUpdated: forecastSkusUpdated, summary: forecastSummary },
+      })))
     } catch (err: any) {
       setError(err.message ?? 'Unexpected error')
     } finally {
       setLoading(false)
+      setLoadingStage(null)
     }
   }
 
   const DropZone = ({
-    channel, file, dragging,
-    onDrag, onDragLeave, onDrop, onChange
+    channel, file, dragging, onDrag, onDragLeave, onDrop, onChange
   }: {
-    channel: Channel
-    file: File | null
-    dragging: boolean
-    onDrag: () => void
-    onDragLeave: () => void
-    onDrop: (e: React.DragEvent) => void
-    onChange: (f: File) => void
+    channel: Channel; file: File | null; dragging: boolean
+    onDrag: () => void; onDragLeave: () => void
+    onDrop: (e: React.DragEvent) => void; onChange: (f: File) => void
   }) => (
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-          channel === 'B2B'
-            ? 'bg-purple-100 text-purple-700'
-            : 'bg-orange-100 text-orange-700'
+          channel === 'B2B' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
         }`}>{channel}</span>
         <span className="text-sm text-gray-600 font-medium">
           {channel === 'B2B' ? 'B2B Order Report' : 'B2C Order Report'}
@@ -283,11 +307,9 @@ export default function SalesHistoryUploadPage() {
         onDrop={onDrop}
         onClick={() => document.getElementById(`file-${channel}`)?.click()}
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-          dragging
-            ? 'border-teal-500 bg-teal-50'
-            : file
-              ? 'border-teal-400 bg-teal-50/40'
-              : 'border-gray-200 bg-gray-50 hover:border-teal-300'
+          dragging ? 'border-teal-500 bg-teal-50'
+          : file ? 'border-teal-400 bg-teal-50/40'
+          : 'border-gray-200 bg-gray-50 hover:border-teal-300'
         }`}
       >
         <input
@@ -316,15 +338,18 @@ export default function SalesHistoryUploadPage() {
     </div>
   )
 
-  const totalForecastSkus = results.reduce((sum, r) => sum + r.forecast.skusUpdated, 0)
   const totalWeeklyRows = results.reduce((sum, r) => sum + r.salesHistory.weeklyRowsProcessed, 0)
   const allUnknownSkus = [...new Set(results.flatMap(r => r.warnings.unknownSkus))]
   const allSkippedStatuses = results.reduce((acc, r) => {
-    Object.entries(r.parseStats.skippedStatuses ?? {}).forEach(([k, v]) => {
-      acc[k] = (acc[k] ?? 0) + v
-    })
+    Object.entries(r.parseStats.skippedStatuses ?? {}).forEach(([k, v]) => { acc[k] = (acc[k] ?? 0) + v })
     return acc
   }, {} as Record<string, number>)
+  const mergedForecastSummary = results.reduce((acc, r) => {
+    Object.entries(r.forecast?.summary ?? {}).forEach(([sku, info]) => { if (!acc[sku]) acc[sku] = info })
+    return acc
+  }, {} as Record<string, ForecastSummaryItem>)
+
+  const loadingLabel = loadingStage === 'forecasting' ? 'Generating forecasts…' : 'Processing…'
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
@@ -335,10 +360,9 @@ export default function SalesHistoryUploadPage() {
       </div>
       <div className="mb-8">
         <p className="text-sm text-gray-500">Upload B2B and/or B2C WMS order reports. Data is rolled up to weekly demand,
-          upserted into the sales history table, and demand forecasts are regenerated automatically.</p>
+        upserted into the sales history table, and demand forecasts are regenerated automatically.</p>
       </div>
 
-      {/* Upload mode notice */}
       <div className="mb-6 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
         <p className="text-xs font-medium text-blue-800 mb-1">Upload Modes</p>
         <ul className="text-xs text-blue-700 space-y-0.5">
@@ -347,50 +371,27 @@ export default function SalesHistoryUploadPage() {
         </ul>
       </div>
 
-      {/* Drop zones */}
       <div className="space-y-4 mb-6">
-        <DropZone
-          channel="B2B"
-          file={b2bFile}
-          dragging={draggingB2b}
-          onDrag={() => setDraggingB2b(true)}
-          onDragLeave={() => setDraggingB2b(false)}
-          onDrop={e => handleDrop(e, 'B2B')}
-          onChange={f => setB2bFile(f)}
-        />
-        <DropZone
-          channel="B2C"
-          file={b2cFile}
-          dragging={draggingB2c}
-          onDrag={() => setDraggingB2c(true)}
-          onDragLeave={() => setDraggingB2c(false)}
-          onDrop={e => handleDrop(e, 'B2C')}
-          onChange={f => setB2cFile(f)}
-        />
+        <DropZone channel="B2B" file={b2bFile} dragging={draggingB2b}
+          onDrag={() => setDraggingB2b(true)} onDragLeave={() => setDraggingB2b(false)}
+          onDrop={e => handleDrop(e, 'B2B')} onChange={f => setB2bFile(f)} />
+        <DropZone channel="B2C" file={b2cFile} dragging={draggingB2c}
+          onDrag={() => setDraggingB2c(true)} onDragLeave={() => setDraggingB2c(false)}
+          onDrop={e => handleDrop(e, 'B2C')} onChange={f => setB2cFile(f)} />
       </div>
 
-      <button
-        onClick={handleRegenerate}
-        disabled={regenerating || loading}
-        className="w-full border border-teal-600 text-teal-600 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
-      >
-        {regenerating ? (
-          <><span className="w-4 h-4 border-2 border-teal-600/30 border-t-teal-600 rounded-full animate-spin" />Regenerating...</>
-        ) : (
-          <><RefreshCw size={15} />Regenerate Forecast from Existing Data</>
-        )}
+      <button onClick={handleRegenerate} disabled={regenerating || loading}
+        className="w-full border border-teal-600 text-teal-600 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 mb-3">
+        {regenerating
+          ? <><span className="w-4 h-4 border-2 border-teal-600/30 border-t-teal-600 rounded-full animate-spin" />Regenerating...</>
+          : <><RefreshCw size={15} />Regenerate Forecast from Existing Data</>}
       </button>
 
-      <button
-        onClick={handleUpload}
-        disabled={(!b2bFile && !b2cFile) || loading}
-        className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
-      >
-        {loading ? (
-          <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing...</>
-        ) : (
-          <><Upload size={15} />Upload & Generate Forecast</>
-        )}
+      <button onClick={handleUpload} disabled={(!b2bFile && !b2cFile) || loading}
+        className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+        {loading
+          ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{loadingLabel}</>
+          : <><Upload size={15} />Upload &amp; Generate Forecast</>}
       </button>
 
       {error && (
@@ -401,7 +402,6 @@ export default function SalesHistoryUploadPage() {
 
       {results.length > 0 && (
         <div className="mt-6 space-y-4">
-          {/* Summary header */}
           <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle size={16} className="text-green-600" />
@@ -409,36 +409,31 @@ export default function SalesHistoryUploadPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <Stat label="Weekly rows saved" value={totalWeeklyRows.toString()} />
-              <Stat label="SKUs forecasted" value={totalForecastSkus.toString()} />
-              <Stat
-                label="Date range"
-                value={results[0]?.parseStats.dateRange
-                  ? `${results[0].parseStats.dateRange.min} → ${results[results.length-1].parseStats.dateRange?.max ?? ''}`
-                  : '—'}
-                small
-              />
+              <Stat label="SKUs forecasted" value={Object.keys(mergedForecastSummary).length.toString()} />
+              <Stat label="Date range" value="—" small />
             </div>
           </div>
 
-          {/* Per-channel breakdown */}
-          {results.map(r => (
+          {results.filter(r => r.salesHistory.weeklyRowsProcessed > 0).map(r => (
             <div key={r.channel} className="border border-gray-200 rounded-xl overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  r.channel === 'B2B'
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'bg-orange-100 text-orange-700'
+                  r.channel === 'B2B' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
                 }`}>{r.channel}</span>
                 <span className="text-sm font-medium text-gray-700">
-                  {r.parseStats.validLineItems.toLocaleString()} line items →{' '}
-                  {r.salesHistory.weeklyRowsProcessed} weekly rows
+                  {r.parseStats.validLineItems.toLocaleString()} line items → {r.salesHistory.weeklyRowsProcessed} weekly rows
                 </span>
               </div>
+            </div>
+          ))}
 
-              {/* Forecast per SKU */}
-              <div className="px-4 py-3 space-y-2">
+          {Object.keys(mergedForecastSummary).length > 0 && (
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Forecast Generated</p>
-                {Object.entries(r.forecast.summary).map(([sku, info]) => (
+              </div>
+              <div className="px-4 py-3 space-y-2">
+                {Object.entries(mergedForecastSummary).map(([sku, info]) => (
                   <div key={sku} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <BarChart2 size={13} className="text-gray-400" />
@@ -449,9 +444,7 @@ export default function SalesHistoryUploadPage() {
                       <span className="text-xs text-gray-400">{info.historyWeeks}wk history</span>
                     </div>
                     {info.mape !== undefined && (
-                      <span className={`text-xs font-medium ${
-                        info.mape < 20 ? 'text-green-600' : info.mape < 40 ? 'text-yellow-600' : 'text-red-500'
-                      }`}>
+                      <span className={`text-xs font-medium ${info.mape < 20 ? 'text-green-600' : info.mape < 40 ? 'text-yellow-600' : 'text-red-500'}`}>
                         MAPE {info.mape}%
                       </span>
                     )}
@@ -459,9 +452,8 @@ export default function SalesHistoryUploadPage() {
                 ))}
               </div>
             </div>
-          ))}
+          )}
 
-          {/* Warnings */}
           {allUnknownSkus.length > 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
               <p className="text-xs font-medium text-yellow-800 mb-1">
@@ -471,13 +463,10 @@ export default function SalesHistoryUploadPage() {
             </div>
           )}
 
-          {/* Skipped statuses (collapsible) */}
           {Object.keys(allSkippedStatuses).length > 0 && (
             <div className="border border-gray-100 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setShowSkipped(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
-              >
+              <button onClick={() => setShowSkipped(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors">
                 <span>Skipped order statuses</span>
                 {showSkipped ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               </button>
@@ -505,4 +494,4 @@ function Stat({ label, value, small }: { label: string; value: string; small?: b
       <p className="text-xs text-green-700">{label}</p>
     </div>
   )
-}
+  }
