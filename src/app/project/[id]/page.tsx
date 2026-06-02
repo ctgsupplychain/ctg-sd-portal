@@ -19,7 +19,6 @@ import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { loadDemandForecast } from '@/lib/forecasting/forecast-lookup'
 import { RefreshCw, Download } from 'lucide-react'
 
-// Get Monday date of current week (ISO: week starts Monday)
 function getCurrentMondayDate(): string {
   const now = new Date()
   const day = now.getDay() === 0 ? 7 : now.getDay()
@@ -122,7 +121,6 @@ export default function ProjectPage() {
       histAvg[sku] = qtys.reduce((a, b) => a + b, 0) / qtys.length
     })
 
-    // Load statistical demand forecast (Tier 2 fallback for ASP=0 SKUs)
     const skuList = skuData?.map((s: any) => s.sku) || []
     const demandForecastMap = await loadDemandForecast(skuList)
 
@@ -141,11 +139,18 @@ export default function ProjectPage() {
         else uncommits[s.receipt_wk] = (uncommits[s.receipt_wk] || 0) + s.qty
       })
       return computeSD({
-        sku, onHand: latestStock[skuRaw.sku] || 0, weeks: wkList,
-        forecast, historicalAvg: histAvg[skuRaw.sku] || 0,
+        sku,
+        onHand: latestStock[skuRaw.sku] || 0,
+        backorderQty: skuRaw.backorder_qty || 0,
+        weeks: wkList,
+        forecast,
+        historicalAvg: histAvg[skuRaw.sku] || 0,
         demandForecast: demandForecastMap.get(skuRaw.sku) ?? null,
-        supplyCommits: commits, supplyUncommits: uncommits,
-        currentWk: CURRENT_WK, thresholdOrderNow: 4, thresholdMonitor: 8,
+        supplyCommits: commits,
+        supplyUncommits: uncommits,
+        currentWk: CURRENT_WK,
+        thresholdOrderNow: 4,
+        thresholdMonitor: 8,
       })
     })
 
@@ -156,16 +161,14 @@ export default function ProjectPage() {
 
   const currentSkuResult = skuResults.find(s => s.sku.sku === selectedSku) || skuResults[0]
   const flag = currentSkuResult ? FLAG_DISPLAY[currentSkuResult.flag] : null
-
-  // Find next commit PO
   const nextCommit = currentSkuResult?.weeks.find(w => w.supplyCommit > 0)
 
   function getAlertMessage(s: SkuSdResult) {
-    const f = FLAG_DISPLAY[s.flag]
-    if (s.flag === 'STOCKOUT') return `${s.sku.sku} — stock depleted. On-Hand: ${s.onHand.toLocaleString()} units · WoC: ${s.weeksOfCover} wks. No supply in pipeline. Raise a purchase order immediately.`
-    if (s.flag === 'PULL_IN') return `${s.sku.sku} — stock depletes soon. Open PO in pipeline. Request supplier to advance delivery.`
-    if (s.flag === 'ORDER_NOW') return `${s.sku.sku} — WoC below threshold. No open supply. Raise purchase order immediately.`
-    if (s.flag === 'MONITOR') return `${s.sku.sku} — WoC: ${s.weeksOfCover} wks. Monitor stock levels closely.`
+    const backorderNote = s.backorderQty > 0 ? ` Backorder: ${s.backorderQty.toLocaleString()} units pending fulfilment.` : ''
+    if (s.flag === 'STOCKOUT') return `${s.sku.sku} — stock depleted. On-Hand: ${s.onHand.toLocaleString()} units · WoC: ${s.weeksOfCover} wks.${backorderNote} No supply in pipeline. Raise a purchase order immediately.`
+    if (s.flag === 'PULL_IN') return `${s.sku.sku} — stock depletes soon.${backorderNote} Open PO in pipeline. Request supplier to advance delivery.`
+    if (s.flag === 'ORDER_NOW') return `${s.sku.sku} — WoC below threshold.${backorderNote} No open supply. Raise purchase order immediately.`
+    if (s.flag === 'MONITOR') return `${s.sku.sku} — WoC: ${s.weeksOfCover} wks.${backorderNote} Monitor stock levels closely.`
     return `${s.sku.sku} — stock level healthy. WoC: ${s.weeksOfCover} wks.`
   }
 
@@ -179,11 +182,8 @@ export default function ProjectPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F0F2F5]">
-      <Sidebar userEmail={profile?.email} userName={profile?.full_name}
-        userRole={profile?.role} brands={brands} activeBrand={brand} />
+      <Sidebar userEmail={profile?.email} userName={profile?.full_name} userRole={profile?.role} brands={brands} activeBrand={brand} />
       <div className="flex-1 flex flex-col overflow-hidden">
-
-        {/* Top bar */}
         <div className="bg-white border-b border-[#EAECF0] px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold text-[#101828]">Supply & Demand</h1>
@@ -192,91 +192,33 @@ export default function ProjectPage() {
           </div>
           <div className="flex items-center gap-2">
             {lastUpdated && <span className="text-xs text-[#98A2B3]">Inventory: {lastUpdated}</span>}
-            <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB]">
-              <Download size={12} /> Export
-            </button>
-            <button onClick={loadAll} className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB]">
-              <RefreshCw size={12} /> Refresh
-            </button>
+            <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB]"><Download size={12} /> Export</button>
+            <button onClick={loadAll} className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB]"><RefreshCw size={12} /> Refresh</button>
           </div>
         </div>
-
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center h-40 text-[#667085] text-sm">Loading S&D data...</div>
           ) : (
             <>
-              
-              {/* 4 Info Cards */}
               {currentSkuResult && flag && (
                 <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">On-Hand ({currentSkuResult.sku.sku})</div>
-                    <div className="text-2xl font-semibold text-[#101828]">{currentSkuResult.onHand.toLocaleString()}</div>
-                    <div className="text-xs mt-1 text-[#667085]">units in stock</div>
-                  </div>
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">Weeks of Cover</div>
-                    <div className="text-2xl font-semibold" style={{
-                      color: currentSkuResult.weeksOfCover < 0 ? '#B42318' : currentSkuResult.weeksOfCover < 4 ? '#B54708' : '#027A48'
-                    }}>{currentSkuResult.weeksOfCover}</div>
-                    <div className="text-xs mt-1 text-[#667085]">Target: ≥ 8 wks</div>
-                  </div>
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">Next PO (Commit)</div>
-                    <div className="text-2xl font-semibold text-[#101828]">
-                      {nextCommit ? nextCommit.supplyCommit.toLocaleString() : '—'}
-                    </div>
-                    <div className="text-xs mt-1 text-[#667085]">
-                      {nextCommit ? `ETA: ${nextCommit.wkLabel}` : 'No open PO'}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">Status</div>
-                    <div className="text-lg font-semibold flex items-center gap-1.5 mt-1" style={{ color: flag.color }}>
-                      <span>{flag.emoji}</span>
-                      <span>{flag.label}</span>
-                    </div>
-                    <div className="text-xs mt-1 text-[#667085]">
-                      {currentSkuResult.flag === 'PULL_IN' && 'Move PO earlier'}
-                      {currentSkuResult.flag === 'ORDER_NOW' && 'Raise PO now'}
-                      {currentSkuResult.flag === 'STOCKOUT' && 'Urgent action required'}
-                      {currentSkuResult.flag === 'MONITOR' && 'Watch closely'}
-                      {currentSkuResult.flag === 'OK' && 'No action needed'}
-                    </div>
-                  </div>
+                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4"><div className="text-xs text-[#667085] mb-1">On-Hand ({currentSkuResult.sku.sku})</div><div className="text-2xl font-semibold text-[#101828]">{currentSkuResult.onHand.toLocaleString()}</div><div className="text-xs mt-1 text-[#667085]">units in stock</div></div>
+                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4"><div className="text-xs text-[#667085] mb-1">Weeks of Cover</div><div className="text-2xl font-semibold" style={{ color: currentSkuResult.weeksOfCover < 0 ? '#B42318' : currentSkuResult.weeksOfCover < 4 ? '#B54708' : '#027A48' }}>{currentSkuResult.weeksOfCover}</div><div className="text-xs mt-1 text-[#667085]">Target: ≅ 8 wks</div></div>
+                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4"><div className="text-xs text-[#667085] mb-1">Next PO (Commit)</div><div className="text-2xl font-semibold text-[#101828]">{nextCommit ? nextCommit.supplyCommit.toLocaleString() : '—'}</div><div className="text-xs mt-1 text-[#667085]">{nextCommit ? `ETA: ${nextCommit.wkLabel}` : 'No open PO'}</div></div>
+                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4"><div className="text-xs text-[#667085] mb-1">Status</div><div className="text-lg font-semibold flex items-center gap-1.5 mt-1" style={{ color: flag.color }}><span>{flag.emoji}</span><span>{flag.label}</span></div><div className="text-xs mt-1 text-[#667085]">{currentSkuResult.flag === 'PULL_IN' && 'Move PO earlier'}{currentSkuResult.flag === 'ORDER_NOW' && 'Raise PO now'}{currentSkuResult.flag === 'STOCKOUT' && 'Urgent action required'}{currentSkuResult.flag === 'MONITOR' && 'Watch closely'}{currentSkuResult.flag === 'OK' && 'No action needed'}</div></div>
                 </div>
               )}
-
-              {/* Alert Banner */}
               {currentSkuResult && currentSkuResult.flag !== 'OK' && (
-                <div className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${alertBg[currentSkuResult.flag]}`}>
-                  <p className="text-sm leading-relaxed">{getAlertMessage(currentSkuResult)}</p>
-                  <span className="text-xs font-medium whitespace-nowrap cursor-pointer opacity-70 hover:opacity-100">View PO →</span>
-                </div>
+                <div className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${alertBg[currentSkuResult.flag]}`}><p className="text-sm leading-relaxed">{getAlertMessage(currentSkuResult)}</p><span className="text-xs font-medium whitespace-nowrap cursor-pointer opacity-70 hover:opacity-100">View PO →</span></div>
               )}
-
-              {/* Weekly S&D Table */}
               <div className="bg-white rounded-xl border border-[#EAECF0] p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-sm font-semibold text-[#344054]">Weekly Supply & Demand</h2>
-                  <span className="text-xs text-[#98A2B3]">Rolling 26 weeks from {CURRENT_WK}</span>
-                </div>
-                {skuResults.length > 0 && weeks.length > 0
-                  ? <SDTable skus={skuResults} weeks={weeks} currentWk={CURRENT_WK} selectedSku={selectedSku} onSkuChange={setSelectedSku} />
-                  : <div className="text-sm text-[#667085] text-center py-8">No SKU data found for {brand}</div>}
+                <div className="flex items-center gap-2 mb-4"><h2 className="text-sm font-semibold text-[#344054]">Weekly Supply & Demand</h2><span className="text-xs text-[#98A2B3]">Rolling 26 weeks from {CURRENT_WK}</span></div>
+                {skuResults.length > 0 && weeks.length > 0 ? <SDTable skus={skuResults} weeks={weeks} currentWk={CURRENT_WK} selectedSku={selectedSku} onSkuChange={setSelectedSku} /> : <div className="text-sm text-[#667085] text-center py-8">No SKU data found for {brand}</div>}
               </div>
-
-              {/* Demand Forecast Chart */}
-              {skuResults.length > 0 && (
-                <ForecastChart
-                  selectedSku={selectedSku}
-                  skuResult={skuResults.find(s => s.sku.sku === selectedSku) ?? null}
-                  brand={brand}
-                />
-              )}
+              {skuResults.length > 0 && (<ForecastChart selectedSku={selectedSku} skuResult={skuResults.find(s => s.sku.sku === selectedSku) ?? null} brand={brand} />)}
             </>
-          )}
+           )}
         </div>
       </div>
     </div>
