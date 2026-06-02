@@ -43,6 +43,7 @@ export interface WeeklyRow {
   wkLabel: string
   forecastRm: number
   forecastQty: number
+  backorderQty: number   // backlog units to fulfil — applied in current week only
   supplyCommit: number
   supplyUncommit: number
   balance: number
@@ -51,6 +52,7 @@ export interface WeeklyRow {
 export interface SkuSdResult {
   sku: SkuMaster
   onHand: number
+  backorderQty: number
   weeksOfCover: number
   flag: 'STOCKOUT' | 'PULL_IN' | 'ORDER_NOW' | 'MONITOR' | 'OK'
   weeks: WeeklyRow[]
@@ -93,6 +95,7 @@ function getForecastQty(
 export function computeSD(params: {
   sku: SkuMaster
   onHand: number
+  backorderQty?: number                        // units to fulfil immediately (current week)
   weeks: WeekInfo[]
   forecast: Record<string, number> | null
   historicalAvg: number
@@ -105,6 +108,7 @@ export function computeSD(params: {
 }): SkuSdResult {
   const {
     sku, onHand, weeks, forecast, historicalAvg,
+    backorderQty = 0,
     demandForecast = null,
     supplyCommits, supplyUncommits, currentWk,
     thresholdOrderNow = 4, thresholdMonitor = 8
@@ -114,9 +118,14 @@ export function computeSD(params: {
   const weeklyRows: WeeklyRow[] = []
 
   for (const wk of weeks) {
+    const isCurrentWk = wk.label === currentWk
     const forecastQty = getForecastQty(sku, wk.year, wk.month, wk.label, forecast, historicalAvg, demandForecast)
     const commit   = supplyCommits[wk.label]   || 0
     const uncommit = supplyUncommits[wk.label] || 0
+
+    // Backorder is consumed in the current week only
+    const backorderThisWk = isCurrentWk ? backorderQty : 0
+
     const forecastRm = sku.avgSellingPrice > 0 && forecast
       ? (() => {
           const colKey = Object.entries(MONTHLY_FORECAST_COLS).find(
@@ -128,56 +137,42 @@ export function computeSD(params: {
         })()
       : 0
 
-    balance = balance + commit - forecastQty
+    balance = balance + commit - forecastQty - backorderThisWk
 
     weeklyRows.push({
       wkLabel: wk.label,
       forecastRm,
       forecastQty,
+      backorderQty: backorderThisWk,
       supplyCommit: commit,
       supplyUncommit: uncommit,
       balance,
     })
   }
 
-  // Weeks of Cover: current balance / avg demand next 4 weeks
   const curIdx = weeks.findIndex(w => w.label === currentWk)
   const curBalance = curIdx >= 0 ? weeklyRows[curIdx]?.balance ?? onHand : onHand
   const next4Demand = weeklyRows
-    .slice(curIdx >= 0 ? curIdx : 0, (curIdx >= 0 ? curIdx : 0) + 4)
+    .slice(curIdx >= 0 ? curIdx + 1 : 0, (curIdx >= 0 ? curIdx + 1 : 0) + 4)
     .map(r => r.forecastQty)
   const avgDemand = next4Demand.length > 0
     ? next4Demand.reduce((a, b) => a + b, 0) / next4Demand.length
     : 0
   const woc = avgDemand > 0 ? curBalance / avgDemand : 0
 
-  // Check for open supply in pipeline
   const hasOpenSupply = Object.values(supplyCommits).some(q => q > 0) ||
                         Object.values(supplyUncommits).some(q => q > 0)
 
-  // Determine flag
-  let flag: SkuSdResult['flag']
-  if (curBalance <= 0) {
-    flag = 'STOCKOUT'
-  } else if (woc <= thresholdOrderNow) {
-    flag = hasOpenSupply ? 'PULL_IN' : 'ORDER_NOW'
-  } else if (woc <= thresholdMonitor) {
-    flag = 'MONITOR'
-  } else {
-    flag = 'OK'
-  }
+  let flag;
+  if (curBalance <= 0) flag = 'STOCKOUT'
+  else if (woc <= thresholdOrderNow) flag = hasOpenSupply ? 'PULL_IN' : 'ORDER_NOW'
+  else if (woc <= thresholdMonitor) flag = 'MONITOR'
+  else flag = 'OK'
 
-  return {
-    sku,
-    onHand,
-    weeksOfCover: Math.round(woc * 10) / 10,
-    flag,
-    weeks: weeklyRows,
-  }
+  return { sku, onHand, backorderQty, weeksOfCover: Math.round(woc * 10) / 10, flag, weeks: weeklyRows }
 }
 
-// Flag display helpers
-export const FLAG_DISPLAY: Record<SkuSdResult['flag'], { emoji: string; label: string; color: string }> = {
+export const FLAG_DISPLAY = {
   STOCKOUT:  { emoji: '🔴', label: 'STOCKOUT',   color: '#B42318' },
   PULL_IN:   { emoji: '⚡', label: 'PULL IN',    color: '#B54708' },
   ORDER_NOW: { emoji: '🟠', label: 'ORDER NOW',  color: '#B54708' },
