@@ -142,7 +142,7 @@ export default function MasterSkuPage() {
       const ws = XLSX.utils.aoa_to_sheet(wsData)
       ws['!cols'] = [
         { wch: 18 }, { wch: 14 }, { wch: 40 }, { wch: 8 },
-        { wch: 10 }, { wch: 16 }, wch: 10 }, { wch: 14 },
+        { wch: 10 }, { wch: 16 }, { wch: 10 }, { wch: 14 },
         { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 20 },
       ]
       const wb = XLSX.utils.book_new()
@@ -334,12 +334,12 @@ export default function MasterSkuPage() {
                     {/* SKU + description — read only */}
                     <td className="px-4 py-2.5">
                       <span className="font-mono text-[11px] text-gray-700">{s.sku}</span>
-                      <p className="text-[11px] text-gray-400 mt-0.5 leading-tight max-t-[280px]">{s.description}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5 leading-tight max-w-[280px]">{s.description}</p>
                     </td>
                     {/* Brand — read only */}
                     <td className="px-4 py-2.5 text-right text-xs text-gray-600">{s.brand}</td>
 
-                    {/* ASP ℔ editable */}
+                    {/* ASP — editable */}
                     <EditableCell
                       sku={s.sku} field="avg_selling_price" value={s.avg_selling_price}
                       inputType="number"
@@ -353,7 +353,7 @@ export default function MasterSkuPage() {
                       display={s.moq > 0 ? <span className="text-xs text-gray-600">{s.moq.toLocaleString()}</span> : <span className="text-gray-300 text-xs">—</span>}
                     />
 
-                    {/* Lead time ℔ editable */}
+                    {/* Lead time — editable */}
                     <EditableCell
                       sku={s.sku} field="lead_time_wk" value={s.lead_time_wk}
                       inputType="number"
@@ -362,7 +362,7 @@ export default function MasterSkuPage() {
 
                     {/* Forecast tier — derived, read only */}
                     <td className="px-4 py-2.5 text-right">
-                      <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${tier === 'GSheet' ? 'bg-teal-50 text-teal-700' : 'bg-gray-100 text-gray-500"}`}>{tier}</span>
+                      <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${tier === 'GSheet' ? 'bg-teal-50 text-teal-700' : 'bg-gray-100 text-gray-500'}`}>{tier}</span>
                     </td>
 
                     {/* Status — editable */}
