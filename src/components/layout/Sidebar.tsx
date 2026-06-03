@@ -129,7 +129,7 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
         {brands.length > 0 && (
           <>
             <div className="px-4 py-2 text-white/30 text-xs uppercase tracking-widest font-medium mt-1">My Projects</div>
-            {brands.map(brand => (
+            {[...brands].sort((a, b) => a.localeCompare(b)).map(brand => (
               <NavItem
                 key={brand}
                 icon={<BarChart3 size={15} />}
@@ -180,7 +180,7 @@ function NavItem({ icon, label, href, active, onClick }: {
       )}
     >
       <span>{icon}</span>
-      <span>{label}</span>
+      <span className="truncate">{label}</span>
     </button>
   )
 }
