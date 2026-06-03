@@ -75,7 +75,7 @@ export default function PlannedPoPage() {
 
     // ── 2. Week calendar ──────────────────────────────────────────────────────
     const { data: wkData } = await supabase
-      .from('week_calendar').select('*').gte('monday_date', CURRENT_MONDAY).order('monday_date').limit(26)
+      .from('week_calendar').select('*').gte('monday_date', CURRENT_MONDAY).order('monday_date').limit(52)
 
     const wkList: WeekInfo[] = (wkData || []).map((w: any) => ({
       label: w.wk_label, year: w.year, month: w.month, monthLabel: w.month_label,
