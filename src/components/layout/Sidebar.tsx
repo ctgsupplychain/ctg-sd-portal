@@ -2,7 +2,10 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import clsx from 'clsx'
-import { LayoutDashboard, Package, BarChart3, Bell, LogOut, FileInput, RefreshCw, Database, TrendingUp, GitMerge } from 'lucide-react'
+import {
+  LayoutDashboard, Package, BarChart3, Bell, LogOut,
+  FileInput, RefreshCw, Database, TrendingUp, GitMerge, ClipboardList
+} from 'lucide-react'
 
 interface SidebarProps {
   userEmail?: string
@@ -104,6 +107,15 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
             href="/plm"
             active={pathname.startsWith('/plm')}
             onClick={() => router.push('/plm')}
+          />
+        )}
+        {userRole === 'supply_chain' && (
+          <NavItem
+            icon={<ClipboardList size={15} />}
+            label="Planned PO"
+            href="/planned-po"
+            active={pathname === '/planned-po'}
+            onClick={() => router.push('/planned-po')}
           />
         )}
         <NavItem
