@@ -181,4 +181,69 @@ export function computeSD(params: {
 
   // Find first negative-balance week (committed supply only)
   let stockoutWk: string | null = null
-  let stockou
+  let stockoutWkIdx: number = -1
+  {
+    let balanceCommitOnly = onHand
+    for (let i = 0; i < weeklyRows.length; i++) {
+      const row = weeklyRows[i]
+      const isCurrentWk = weeks[i].label === currentWk
+      const backorderThisWk = isCurrentWk ? backorderQty : 0
+      // Re-run balance using committed supply only (excludes uncommitted)
+      balanceCommitOnly = balanceCommitOnly + row.supplyCommit - row.forecastQty - backorderThisWk
+      if (balanceCommitOnly < 0 && stockoutWk === null) {
+        stockoutWk = row.wkLabel
+        stockoutWkIdx = i
+      }
+    }
+  }
+
+  // Calculate planned PO release date
+  // = stockout_week_idx - LT - 1 (ops buffer)
+  // Safety stock buffer: TODO — add `sku.safetyStock` in weeks once defined
+  let plannedPoReleaseDateWk: string | null = null
+  if (stockoutWkIdx >= 0) {
+    const releaseIdx = stockoutWkIdx - lt - 1  // -1 = ops buffer week
+    // Safety stock buffer will shift this further left once SS is configured per SKU
+    if (releaseIdx >= 0 && releaseIdx < weeks.length) {
+      plannedPoReleaseDateWk = weeks[releaseIdx].label
+    } else if (releaseIdx < 0) {
+      // Release date is in the past — overdue
+      plannedPoReleaseDateWk = weeks[0].label  // pin to first visible week as "overdue"
+    }
+  }
+
+  // Determine flag
+  // STOCKOUT   : already negative this week
+  // RELEASE_PO : stockout within LT horizon AND no committed supply covers it
+  // PLAN_PO    : stockout exists but outside LT horizon (time to plan, not urgent)
+  // OK         : no stockout within full horizon, or committed supply covers all gaps
+  let flag: SkuSdResult['flag']
+  if (curBalance <= 0) {
+    flag = 'STOCKOUT'
+  } else if (stockoutWkIdx >= 0 && stockoutWkIdx - curWkIdx <= lt) {
+    flag = 'RELEASE_PO'
+  } else if (stockoutWkIdx >= 0) {
+    flag = 'PLAN_PO'
+  } else {
+    flag = 'OK'
+  }
+
+  return {
+    sku,
+    onHand,
+    backorderQty,
+    weeksOfCover: Math.round(woc * 10) / 10,
+    flag,
+    plannedPoReleaseDateWk,
+    stockoutWk,
+    weeks: weeklyRows,
+  }
+}
+
+// Flag display helpers
+export const FLAG_DISPLAY: Record<SkuSdResult['flag'], { emoji: string; label: string; color: string }> = {
+  STOCKOUT:   { emoji: '🔴', label: 'STOCKOUT',   color: '#B42318' },
+  RELEASE_PO: { emoji: '🟠', label: 'RELEASE PO', color: '#B54708' },
+  PLAN_PO:    { emoji: '🟡', label: 'PLAN PO',    color: '#854D0E' },
+  OK:         { emoji: '🟢', label: 'OK',         color: '#166534' },
+}
