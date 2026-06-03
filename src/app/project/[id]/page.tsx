@@ -264,7 +264,7 @@ export default function ProjectPage() {
               <div className="bg-white rounded-xl border border-[#EAECF0] p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <h2 className="text-sm font-semibold text-[#344054]">Weekly Supply & Demand</h2>
-                  <span className="text-xs text-[#98A2B3]">Rolling 26 weeks from {CURRENT_WK}</span>
+                  <span className="text-xs text-[#98A2B3]">Rolling 52 weeks from {CURRENT_WK}</span>
                 </div>
                 {skuResults.length > 0 && weeks.length > 0
                   ? <SDTable skus={skuResults} weeks={weeks} currentWk={CURRENT_WK} selectedSku={selectedSku} onSkuChange={setSelectedSku} />
