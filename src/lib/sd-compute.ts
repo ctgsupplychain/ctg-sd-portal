@@ -54,7 +54,9 @@ export interface SkuSdResult {
   onHand: number
   backorderQty: number
   weeksOfCover: number
-  flag: 'STOCKOUT' | 'PULL_IN' | 'ORDER_NOW' | 'MONITOR' | 'OK'
+  flag: 'STOCKOUT' | 'RELEASE_PO' | 'PLAN_PO' | 'OK'
+  plannedPoReleaseDateWk: string | null   // wkLabel of latest safe PO release date; null if no action needed
+  stockoutWk: string | null               // first week balance goes negative within horizon; null if none
   weeks: WeeklyRow[]
 }
 
@@ -150,6 +152,9 @@ export function computeSD(params: {
     })
   }
 
+  // Weeks of Cover: balance at end of current week / avg demand next 4 weeks
+  // The current-week balance already reflects backorder deduction, so WoC is
+  // naturally adjusted for the backlog obligation.
   const curIdx = weeks.findIndex(w => w.label === currentWk)
   const curBalance = curIdx >= 0 ? weeklyRows[curIdx]?.balance ?? onHand : onHand
   const next4Demand = weeklyRows
@@ -160,22 +165,20 @@ export function computeSD(params: {
     : 0
   const woc = avgDemand > 0 ? curBalance / avgDemand : 0
 
-  const hasOpenSupply = Object.values(supplyCommits).some(q => q > 0) ||
-                        Object.values(supplyUncommits).some(q => q > 0)
+  // ── LT-aware status logic ─────────────────────────────────────────────────
+  //
+  // Find the first week where balance < 0 (committed supply only — uncommitted
+  // is excluded intentionally: a PO not yet confirmed cannot prevent a stockout).
+  //
+  // Then determine if that stockout falls within the lead time window.
+  // If it does, a PO must be placed NOW; if it's beyond LT, flag as PLAN_PO.
+  //
+  // Release date = stockout_week - LT - 1 week (ops buffer)
+  //                            - safetyStock buffer [TODO: fill in after SS is defined per SKU]
+  //
+  const lt = sku.leadTimeWk ?? 0
+  const curWkIdx = weeks.findIndex(w => w.label === currentWk)
 
-  let flag;
-  if (curBalance <= 0) flag = 'STOCKOUT'
-  else if (woc <= thresholdOrderNow) flag = hasOpenSupply ? 'PULL_IN' : 'ORDER_NOW'
-  else if (woc <= thresholdMonitor) flag = 'MONITOR'
-  else flag = 'OK'
-
-  return { sku, onHand, backorderQty, weeksOfCover: Math.round(woc * 10) / 10, flag, weeks: weeklyRows }
-}
-
-export const FLAG_DISPLAY = {
-  STOCKOUT:  { emoji: '🔴', label: 'STOCKOUT',   color: '#B42318' },
-  PULL_IN:   { emoji: '⚡', label: 'PULL IN',    color: '#B54708' },
-  ORDER_NOW: { emoji: '🟠', label: 'ORDER NOW',  color: '#B54708' },
-  MONITOR:   { emoji: '🟡', label: 'MONITOR',    color: '#854D0E' },
-  OK:        { emoji: '🟢', label: 'OK',         color: '#166534' },
-}
+  // Find first negative-balance week (committed supply only)
+  let stockoutWk: string | null = null
+  let stockou
