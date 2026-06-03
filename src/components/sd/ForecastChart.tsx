@@ -19,12 +19,16 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
   const chartRef  = useRef<any>(null)
   const chartLib  = useRef<any>(null)
 
-  const [history,  setHistory]  = useState<HistoryPoint[]>([])
-  const [forecast, setForecast] = useState<ForecastPoint[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [ready,    setReady]    = useState(false)   // Chart.js loaded
-  const [showCI,   setShowCI]   = useState(true)
-  const [showHist, setShowHist] = useState(true)
+  const [history,    setHistory]    = useState<HistoryPoint[]>([])
+  const [b2bHistory, setB2bHistory] = useState<HistoryPoint[]>([])
+  const [b2cHistory, setB2cHistory] = useState<HistoryPoint[]>([])
+  const [forecast,   setForecast]   = useState<ForecastPoint[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [ready,      setReady]      = useState(false)   // Chart.js loaded
+  const [showCI,     setShowCI]     = useState(true)
+  const [showHist,   setShowHist]   = useState(true)
+  const [showB2B,    setShowB2B]    = useState(false)
+  const [showB2C,    setShowB2C]    = useState(false)
 
   // Load Chart.js once
   useEffect(() => {
@@ -52,7 +56,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
   useEffect(() => {
     if (!ready || loading) return
     renderChart()
-  }, [ready, loading, history, forecast, showCI, showHist, skuResult])
+  }, [ready, loading, history, b2bHistory, b2cHistory, forecast, showCI, showHist, showB2B, showB2C, skuResult])
 
   async function loadData(sku: string) {
     setLoading(true)
@@ -60,7 +64,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
     const [histRes, fcRes] = await Promise.all([
       supabase
         .from('sales_history')
-        .select('iso_year, iso_week, qty, week_start_date')
+        .select('iso_year, iso_week, qty, week_start_date, channel')
         .eq('sku', sku)
         .order('iso_year').order('iso_week'),
       supabase
@@ -70,18 +74,37 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
         .order('iso_year').order('iso_week'),
     ])
 
-    // Aggregate B2B+B2C per week
-    const weekMap = new Map<string, { qty: number; date: string }>()
+    // Aggregate total, B2B, and B2C per week
+    const weekMap    = new Map<string, { qty: number; date: string }>()
+    const b2bMap     = new Map<string, { qty: number; date: string }>()
+    const b2cMap     = new Map<string, { qty: number; date: string }>()
+
     histRes.data?.forEach((h: any) => {
-      const key = `${h.iso_year}-W${String(h.iso_week).padStart(2,'0')}`
+      const key  = `${h.iso_year}-W${String(h.iso_week).padStart(2,'0')}`
+      const date = h.week_start_date ?? ''
+
+      // Total
       const prev = weekMap.get(key)
       if (prev) prev.qty += h.qty
-      else weekMap.set(key, { qty: h.qty, date: h.week_start_date ?? '' })
+      else weekMap.set(key, { qty: h.qty, date })
+
+      // Channel split
+      const ch = (h.channel ?? '').toUpperCase()
+      if (ch === 'B2B') {
+        const p = b2bMap.get(key)
+        if (p) p.qty += h.qty
+        else b2bMap.set(key, { qty: h.qty, date })
+      } else if (ch === 'B2C') {
+        const p = b2cMap.get(key)
+        if (p) p.qty += h.qty
+        else b2cMap.set(key, { qty: h.qty, date })
+      }
     })
 
-    const histPoints: HistoryPoint[] = Array.from(weekMap.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([key, v]) => ({ wk: key, qty: v.qty, date: v.date }))
+    const toPoints = (map: Map<string, { qty: number; date: string }>): HistoryPoint[] =>
+      Array.from(map.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, v]) => ({ wk: key, qty: v.qty, date: v.date }))
 
     const fcPoints: ForecastPoint[] = (fcRes.data ?? []).map((f: any) => ({
       wk:    f.wk_label,
@@ -91,7 +114,9 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       date:  f.week_start_date ?? '',
     }))
 
-    setHistory(histPoints)
+    setHistory(toPoints(weekMap))
+    setB2bHistory(toPoints(b2bMap))
+    setB2cHistory(toPoints(b2cMap))
     setForecast(fcPoints)
     setLoading(false)
   }
@@ -114,7 +139,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
     const fcLabels   = forecast.map(f => fmtDate(f.date) || f.wk)
     const allLabels  = [...(showHist ? histLabels : []), ...fcLabels]
 
-    const fcPad  = new Array(nHist).fill(null)
+    const fcPad   = new Array(nHist).fill(null)
     const histPad = new Array(nFc).fill(null)
     const datasets: any[] = []
 
@@ -123,13 +148,13 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
         label: 'CI upper',
         data: [...fcPad, ...forecast.map(f => f.upper)],
         borderColor: 'transparent', backgroundColor: 'rgba(29,158,117,0.12)',
-        fill: '+1', pointRadius: 0, tension: 0.3, order: 4,
+        fill: '+1', pointRadius: 0, tension: 0.3, order: 5,
       })
       datasets.push({
         label: 'CI lower',
         data: [...fcPad, ...forecast.map(f => f.lower)],
         borderColor: 'transparent', backgroundColor: 'rgba(29,158,117,0.12)',
-        fill: false, pointRadius: 0, tension: 0.3, order: 4,
+        fill: false, pointRadius: 0, tension: 0.3, order: 5,
       })
     }
 
@@ -151,6 +176,33 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       })
     }
 
+    // B2B channel line — aligned to total history labels
+    if (showB2B && showHist && b2bHistory.length > 0) {
+      // Map b2bHistory by wk key for fast lookup
+      const b2bMap = new Map(b2bHistory.map(p => [p.wk, p.qty]))
+      const b2bData = history.map(h => b2bMap.get(h.wk) ?? null)
+      datasets.push({
+        label: 'B2B',
+        data: [...b2bData, ...histPad],
+        borderColor: '#7C3AED', backgroundColor: 'transparent',
+        borderWidth: 1.5, borderDash: [3, 2],
+        pointRadius: 0, pointHoverRadius: 4, tension: 0.2, order: 4,
+      })
+    }
+
+    // B2C channel line
+    if (showB2C && showHist && b2cHistory.length > 0) {
+      const b2cMap = new Map(b2cHistory.map(p => [p.wk, p.qty]))
+      const b2cData = history.map(h => b2cMap.get(h.wk) ?? null)
+      datasets.push({
+        label: 'B2C',
+        data: [...b2cData, ...histPad],
+        borderColor: '#E8474C', backgroundColor: 'transparent',
+        borderWidth: 1.5, borderDash: [3, 2],
+        pointRadius: 0, pointHoverRadius: 4, tension: 0.2, order: 4,
+      })
+    }
+
     if (skuResult && skuResult.weeks.length > 0) {
       datasets.push({
         label: 'S&D plan',
@@ -161,21 +213,16 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       })
     }
 
-    // Safety stock reference line — flat horizontal across full chart width
+    // Safety stock reference line
     const safetyStock = skuResult?.sku.safetyStock ?? 0
     if (safetyStock > 0) {
       const totalPoints = nHist + nFc
       datasets.push({
         label: 'Safety stock',
         data: new Array(totalPoints).fill(safetyStock),
-        borderColor: '#EF9F27',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [3, 3],
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        tension: 0,
-        order: 0,
+        borderColor: '#EF9F27', backgroundColor: 'transparent',
+        borderWidth: 1.5, borderDash: [3, 3],
+        pointRadius: 0, pointHoverRadius: 0, tension: 0, order: 0,
       })
     }
 
@@ -242,6 +289,14 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
             History
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" checked={showB2B} onChange={e => setShowB2B(e.target.checked)} className="accent-[#7C3AED]" />
+            B2B
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" checked={showB2C} onChange={e => setShowB2C(e.target.checked)} className="accent-[#E8474C]" />
+            B2C
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
             <input type="checkbox" checked={showCI} onChange={e => setShowCI(e.target.checked)} className="accent-[#1D9E75]" />
             80% CI band
           </label>
@@ -263,6 +318,22 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
             {l.label}
           </span>
         ))}
+        {showB2B && (
+          <span className="flex items-center gap-1.5 text-xs text-[#667085]">
+            <svg width="20" height="10" aria-hidden="true">
+              <line x1="0" y1="5" x2="20" y2="5" stroke="#7C3AED" strokeWidth="2" strokeDasharray="3 2" />
+            </svg>
+            B2B
+          </span>
+        )}
+        {showB2C && (
+          <span className="flex items-center gap-1.5 text-xs text-[#667085]">
+            <svg width="20" height="10" aria-hidden="true">
+              <line x1="0" y1="5" x2="20" y2="5" stroke="#E8474C" strokeWidth="2" strokeDasharray="3 2" />
+            </svg>
+            B2C
+          </span>
+        )}
         {showCI && (
           <span className="flex items-center gap-1.5 text-xs text-[#667085]">
             <span className="w-5 h-3 inline-block rounded-sm" style={{ background: 'rgba(29,158,117,0.2)' }} />
@@ -288,10 +359,10 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       {forecast.length > 0 && (
         <div className="mt-3 pt-3 border-t border-[#EAECF0] grid grid-cols-4 gap-3">
           {[
-            { label: '26-wk total',   value: fc26total.toLocaleString() },
-            { label: 'Avg / wk',      value: Math.round(fc26total / forecast.length).toLocaleString() },
-            { label: 'Wk 1 forecast', value: (forecast[0]?.qty ?? 0).toLocaleString() },
-            { label: 'Wk 26 forecast',value: (forecast[25]?.qty ?? 0).toLocaleString() },
+            { label: '26-wk total',    value: fc26total.toLocaleString() },
+            { label: 'Avg / wk',       value: Math.round(fc26total / forecast.length).toLocaleString() },
+            { label: 'Wk 1 forecast',  value: (forecast[0]?.qty ?? 0).toLocaleString() },
+            { label: 'Wk 26 forecast', value: (forecast[25]?.qty ?? 0).toLocaleString() },
           ].map(s => (
             <div key={s.label}>
               <p className="text-[10px] text-[#98A2B3] uppercase tracking-wide mb-0.5">{s.label}</p>
