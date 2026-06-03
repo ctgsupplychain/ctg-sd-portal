@@ -61,6 +61,14 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
   async function loadData(sku: string) {
     setLoading(true)
 
+    // week_start_date is stored as Sunday; current week's Sunday = Monday - 1 day
+    const today = new Date()
+    const dow = today.getDay() // 0=Sun, 1=Mon, ...
+    const diffToMon = dow === 0 ? -6 : 1 - dow
+    const currentSunday = new Date(today)
+    currentSunday.setDate(today.getDate() + diffToMon - 1)
+    const currentWeekSundayStr = currentSunday.toISOString().slice(0, 10)
+
     const [histRes, fcRes] = await Promise.all([
       supabase
         .from('sales_history')
@@ -71,6 +79,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
         .from('demand_forecast')
         .select('wk_label, forecast_qty, lower_bound, upper_bound, week_start_date')
         .eq('sku', sku)
+        .gte('week_start_date', currentWeekSundayStr)
         .order('iso_year').order('iso_week'),
     ])
 
@@ -176,7 +185,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       })
     }
 
-    // B2B channel line — aligned to total history labels
+    // B2B channel line â aligned to total history labels
     if (showB2B && showHist && b2bHistory.length > 0) {
       // Map b2bHistory by wk key for fast lookup
       const b2bMap = new Map(b2bHistory.map(p => [p.wk, p.qty]))
