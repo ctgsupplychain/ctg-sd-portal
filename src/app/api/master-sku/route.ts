@@ -9,6 +9,36 @@ function getSupabase() {
   )
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await getSupabase().auth.getUser(token)
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'supply_chain') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const body = await req.json()
+    const { sku, ...fields } = body
+    if (!sku) return NextResponse.json({ error: 'SKU is required' }, { status: 400 })
+    if (!Object.keys(fields).length) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+
+    const { error: updateErr } = await getSupabase()
+      .from('master_sku')
+      .update(fields)
+      .eq('sku', sku)
+
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+    return NextResponse.json({ success: true, sku, updated: fields })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization')
@@ -55,7 +85,7 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      // Build record — only include non-null/non-empty values
+      // Build record — pnly include non-null/non-empty values
       const record: any = { sku }
 
 if (isNew) {
