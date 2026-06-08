@@ -557,4 +557,121 @@ export interface HistoryPoint {
  */
 export function generateForecast(
   sku: string,
-  history: HistoryPoint[]
+  history: HistoryPoint[],
+  startFrom?: { isoYear: number; isoWeek: number },
+  stockoutWeeks?: Set<string>   // 'isoYear-isoWeek' keys where ATP=0 confirmed
+): ForecastResult {
+  const HORIZON = 26
+
+  const sorted = [...history].sort(
+    (a, b) => a.isoYear * 100 + a.isoWeek - (b.isoYear * 100 + b.isoWeek)
+  )
+
+  if (sorted.length === 0) {
+    return { sku, model: 'avg', historyWeeks: 0, cappedWeeks: 0, stockoutCorrectedWeeks: 0, points: [], mape: undefined }
+  }
+
+  // Build dense aligned week list across full history range
+  const firstWk = { isoYear: sorted[0].isoYear, isoWeek: sorted[0].isoWeek }
+  const lastWk  = { isoYear: sorted[sorted.length-1].isoYear, isoWeek: sorted[sorted.length-1].isoWeek }
+  const weeks: { isoYear: number; isoWeek: number }[] = []
+  let cur = { ...firstWk }
+  while (cur.isoYear < lastWk.isoYear || (cur.isoYear === lastWk.isoYear && cur.isoWeek <= lastWk.isoWeek)) {
+    weeks.push({ ...cur })
+    cur = addIsoWeeks(cur.isoYear, cur.isoWeek, 1)
+  }
+  const weekKeys = weeks.map(w => `${w.isoYear}-${w.isoWeek}`)
+
+  const hasChannels = sorted.some(p => p.channel)
+  let series: number[]
+  let cappedWeeks = 0
+
+  if (hasChannels) {
+    const b2bMap = new Map<string, number>()
+    const b2cMap = new Map<string, number>()
+    for (const p of sorted) {
+      const key = `${p.isoYear}-${p.isoWeek}`
+      if (p.channel === 'B2B') b2bMap.set(key, (b2bMap.get(key) ?? 0) + p.qty)
+      else                     b2cMap.set(key, (b2cMap.get(key) ?? 0) + p.qty)
+    }
+
+    const b2cValues = weeks.map(w => b2cMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
+    const b2cFilled = fillGapsWithTrailingAvg(b2cValues)
+    const b2bValues = weeks.map(w => b2bMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
+    const b2bFilled = fillGapsWithTrailingAvg(b2bValues)
+
+    const { combined, b2bCappedIndices } = combineChannels(b2bFilled, b2cFilled)
+    series = combined
+    cappedWeeks = b2bCappedIndices.length
+  } else {
+    const combinedMap = new Map<string, number>()
+    for (const p of sorted) {
+      const key = `${p.isoYear}-${p.isoWeek}`
+      combinedMap.set(key, (combinedMap.get(key) ?? 0) + p.qty)
+    }
+    const rawValues = weeks.map(w => combinedMap.get(`${w.isoYear}-${w.isoWeek}`) ?? null)
+    series = fillGapsWithTrailingAvg(rawValues)
+  }
+
+  // Apply stockout correction — replace confirmed stockout zeros with trailing avg
+  const hasAtpData = stockoutWeeks !== undefined
+  const { corrected: seriesAfterStockout, correctedCount: stockoutCorrectedWeeks } =
+    applyStockoutCorrection(series, stockoutWeeks ?? new Set(), weekKeys, hasAtpData)
+  series = seriesAfterStockout
+
+  const n = series.length
+
+  let model: ForecastModel
+  let rawForecast: number[]
+  let residuals: number[]
+
+  if (n >= 16) {
+    model = 'holts_linear'
+    ;({ forecast: rawForecast, residuals } = holtsLinear(series, HORIZON))
+  } else if (n >= 8) {
+    model = 'ses'
+    ;({ forecast: rawForecast, residuals } = ses(series, HORIZON))
+  } else {
+    model = 'avg'
+    ;({ forecast: rawForecast, residuals } = simpleAverage(series, HORIZON))
+  }
+
+  const { lower, upper } = confidenceBounds(rawForecast, residuals)
+
+  let { isoYear: curYear, isoWeek: curWeek } = startFrom ?? (() => {
+    const iso = dateToIsoWeek(new Date())
+    return addIsoWeeks(iso.isoYear, iso.isoWeek, 1)
+  })()
+
+  const points: ForecastPoint[] = rawForecast.map((_, h) => {
+    const { isoYear, isoWeek } = addIsoWeeks(curYear, curWeek, h)
+    const monday = isoWeekToMonday(isoYear, isoWeek)
+    return {
+      isoYear,
+      isoWeek,
+      weekStartDate: toDateStr(monday),
+      wkLabel: toWkLabel(isoWeek),
+      forecastQty: Math.round(rawForecast[h]),
+      lowerBound: lower[h],
+      upperBound: upper[h],
+    }
+  })
+
+  // MAPE holdout on last 4 weeks
+  let mape: number | undefined
+  if (n >= 8) {
+    const trainSeries = series.slice(0, -4)
+    const holdout = series.slice(-4)
+    const { forecast: hindcast } = n >= 16
+      ? holtsLinear(trainSeries, 4)
+      : ses(trainSeries, 4)
+    const mapeVals = holdout
+      .map((actual, i) => actual > 0 ? Math.abs(actual - hindcast[i]) / actual : null)
+      .filter((v): v is number => v !== null)
+    if (mapeVals.length > 0) {
+      mape = Math.round((mapeVals.reduce((a, b) => a + b, 0) / mapeVals.length) * 1000) / 10
+    }
+  }
+
+  return { sku, model, historyWeeks: n, cappedWeeks, stockoutCorrectedWeeks, points, mape, residuals, series }
+}
