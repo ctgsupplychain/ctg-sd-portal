@@ -47,6 +47,68 @@ function addWeeks(dateStr: string, weeks: number): string {
   return d.toISOString().split('T')[0]
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await getSupabase().auth.getUser(token)
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'supply_chain') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const body = await req.json()
+    const { id, ...fields } = body
+    if (!id) return NextResponse.json({ error: 'PO id is required' }, { status: 400 })
+    if (!Object.keys(fields).length) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+
+    // Recompute dependent fields when qty / qty_shipped / delivery_date change
+    const { data: existing } = await getSupabase()
+      .from('purchase_orders').select('*').eq('id', id).single()
+    if (!existing) return NextResponse.json({ error: 'PO not found' }, { status: 404 })
+
+    const merged = { ...existing, ...fields }
+    const qty = Number(merged.qty) || 0
+    const qtyShipped = Number(merged.qty_shipped) || 0
+    fields.balance_qty = qty - qtyShipped
+
+    if ('qty' in fields || 'unit_price' in fields || 'tax_pct' in fields) {
+      const unitPrice = Number(merged.unit_price) || 0
+      const taxPct = Number(merged.tax_pct) || 0
+      const subtotal = qty * unitPrice
+      const taxAmount = subtotal * taxPct / 100
+      fields.subtotal = subtotal
+      fields.tax_amount = taxAmount
+      fields.po_total = subtotal + taxAmount
+    }
+
+    if ('delivery_date' in fields) {
+      if (fields.delivery_date) {
+        fields.receipt_wk = dateToWkLabel(fields.delivery_date)
+        fields.commit_status = 'Commit'
+      } else {
+        fields.receipt_wk = null
+        fields.commit_status = 'Uncommit'
+      }
+    }
+
+    fields.updated_at = new Date().toISOString()
+
+    const { error: updateErr } = await getSupabase()
+      .from('purchase_orders')
+      .update(fields)
+      .eq('id', id)
+
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+    return NextResponse.json({ success: true, id, updated: fields })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Auth check

@@ -136,9 +136,13 @@ export default function ProjectPage() {
       const skuSupply = supplyData?.filter((s: any) => s.sku === skuRaw.sku) || []
       const commits: Record<string, number> = {}
       const uncommits: Record<string, number> = {}
+      const wkLabels = new Set(wkList.map(w => w.label))
       skuSupply.forEach((s: any) => {
-        if (s.commit_status === 'Commit') commits[s.receipt_wk] = (commits[s.receipt_wk] || 0) + s.qty
-        else uncommits[s.receipt_wk] = (uncommits[s.receipt_wk] || 0) + s.qty
+        // Open POs whose receipt_wk has already passed (delayed, not yet received)
+        // roll forward into the current week so the qty doesn't disappear from view.
+        const wk = (s.receipt_wk && wkLabels.has(s.receipt_wk)) ? s.receipt_wk : CURRENT_WK
+        if (s.commit_status === 'Commit') commits[wk] = (commits[wk] || 0) + s.qty
+        else uncommits[wk] = (uncommits[wk] || 0) + s.qty
       })
       return computeSD({
         sku,
