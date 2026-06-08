@@ -363,7 +363,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
         )}
       </div>
 
-      <div style={{ position: 'relative', height: '240px' }}>
+      <div style={{ position: 'relative', height: '240px', overflowX: 'auto', overflowY: 'hidden' }}>
         {loading ? (
           <div className="flex items-center justify-center h-full text-sm text-[#98A2B3]">Loading forecast data...</div>
         ) : !ready ? (
@@ -373,17 +373,19 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
             No forecast data. Upload sales history to generate.
           </div>
         ) : (
-          <canvas ref={canvasRef} />
+          <div style={{ position: 'relative', height: '100%', minWidth: `${Math.max(((showHist ? history.length : 0) + forecast.length) * 24, 600)}px` }}>
+            <canvas ref={canvasRef} />
+          </div>
         )}
       </div>
 
       {forecast.length > 0 && (
         <div className="mt-3 pt-3 border-t border-[#EAECF0] grid grid-cols-4 gap-3">
           {[
-            { label: '26-wk total',    value: fc26total.toLocaleString() },
+            { label: '52-wk total',    value: fc26total.toLocaleString() },
             { label: 'Avg / wk',       value: Math.round(fc26total / forecast.length).toLocaleString() },
             { label: 'Wk 1 forecast',  value: (forecast[0]?.qty ?? 0).toLocaleString() },
-            { label: 'Wk 26 forecast', value: (forecast[25]?.qty ?? 0).toLocaleString() },
+            { label: 'Wk 52 forecast', value: (forecast[51]?.qty ?? 0).toLocaleString() },
           ].map(s => (
             <div key={s.label}>
               <p className="text-[10px] text-[#98A2B3] uppercase tracking-wide mb-0.5">{s.label}</p>

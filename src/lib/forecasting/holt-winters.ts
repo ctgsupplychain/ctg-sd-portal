@@ -561,7 +561,7 @@ export function generateForecast(
   startFrom?: { isoYear: number; isoWeek: number },
   stockoutWeeks?: Set<string>   // 'isoYear-isoWeek' keys where ATP=0 confirmed
 ): ForecastResult {
-  const HORIZON = 26
+  const HORIZON = 52
 
   const sorted = [...history].sort(
     (a, b) => a.isoYear * 100 + a.isoWeek - (b.isoYear * 100 + b.isoWeek)
