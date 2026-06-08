@@ -13,6 +13,14 @@ interface ForecastChartProps {
 interface HistoryPoint { wk: string; qty: number; date: string }
 interface ForecastPoint { wk: string; qty: number; lower: number; upper: number; date: string }
 
+const MODEL_DISPLAY: Record<string, string> = {
+  growth_hybrid: 'Growth-Hybrid',
+  holts_linear_mgmt_seasonal: 'Holt-Winters (seasonal)',
+  holts_linear: 'Holt-Winters',
+  ses: 'SES',
+  avg: 'Avg',
+}
+
 export default function ForecastChart({ selectedSku, skuResult }: ForecastChartProps) {
   const supabase  = createClient()
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -23,6 +31,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
   const [b2bHistory, setB2bHistory] = useState<HistoryPoint[]>([])
   const [b2cHistory, setB2cHistory] = useState<HistoryPoint[]>([])
   const [forecast,   setForecast]   = useState<ForecastPoint[]>([])
+  const [modelUsed,  setModelUsed]  = useState<string | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [ready,      setReady]      = useState(false)   // Chart.js loaded
   const [showCI,     setShowCI]     = useState(true)
@@ -77,7 +86,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
         .order('iso_year').order('iso_week'),
       supabase
         .from('demand_forecast')
-        .select('wk_label, forecast_qty, lower_bound, upper_bound, week_start_date')
+        .select('wk_label, forecast_qty, lower_bound, upper_bound, week_start_date, model_used')
         .eq('sku', sku)
         .gte('week_start_date', currentWeekSundayStr)
         .order('iso_year').order('iso_week'),
@@ -127,6 +136,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
     setB2bHistory(toPoints(b2bMap))
     setB2cHistory(toPoints(b2cMap))
     setForecast(fcPoints)
+    setModelUsed((fcRes.data?.[0] as any)?.model_used ?? null)
     setLoading(false)
   }
 
@@ -275,7 +285,9 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
 
   const asp        = skuResult?.sku.avgSellingPrice ?? 0
   const modelLabel = forecast.length > 0
-    ? (asp > 0 ? 'GSheet plan' : history.length >= 16 ? 'Holt-Winters' : history.length >= 8 ? 'Wtd MA' : 'Avg')
+    ? (modelUsed
+        ? (MODEL_DISPLAY[modelUsed] ?? modelUsed)
+        : (asp > 0 ? 'GSheet plan' : history.length >= 16 ? 'Holt-Winters' : history.length >= 8 ? 'Wtd MA' : 'Avg'))
     : null
   const fc26total  = forecast.reduce((a, f) => a + f.qty, 0)
 
@@ -315,7 +327,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       <div className="flex gap-5 mb-3 flex-wrap">
         {[
           { color: '#888780', label: 'Actuals',  dash: false },
-          { color: '#1D9E75', label: asp > 0 ? 'Stat. model' : 'Forecast', dash: false },
+          { color: '#1D9E75', label: modelLabel ?? 'Forecast', dash: false },
           { color: '#378ADD', label: 'S&D plan', dash: true },
           { color: '#EF9F27', label: 'Safety stock', dash: true },
         ].map(l => (

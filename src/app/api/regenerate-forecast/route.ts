@@ -14,7 +14,17 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { generateForecast, dateToIsoWeek } from '@/lib/forecasting/holt-winters'
+import {
+  generateForecast, dateToIsoWeek,
+  detectCycleLength, averageResidualsByCyclePosition, tileShapeOverHorizon, growthHybridBounds,
+} from '@/lib/forecasting/holt-winters'
+
+// Weeks per calendar month — mirrors sd-compute.ts MONTH_WEEKS (kept in sync; both
+// derive from the same fiscal week-mapping convention used across the portal)
+const MONTH_WEEKS: Record<number, number> = {
+  1: 4, 2: 4, 3: 5, 4: 4, 5: 4, 6: 5,
+  7: 4, 8: 4, 9: 5, 10: 4, 11: 4, 12: 5,
+}
 
 function getSupabase() {
   return createClient(
@@ -103,21 +113,28 @@ export async function POST(req: NextRequest) {
       feb_27: '2027-02', mar_27: '2027-03', apr_27: '2027-04',
     }
 
-    // Precompute seasonal index map per brand
-    const seasonalByBrand = new Map<string, Map<string, number>>()
+    // Precompute monthly RM map per brand: 'YYYY-MM' -> forecasted revenue (RM)
+    // This is the raw forward-looking trajectory submitted by project owners —
+    // it already encodes their own read on upcoming demand drivers (campaigns,
+    // ad pushes, etc). Used directly as the growth-hybrid trend backbone below
+    // (replacing the old normalized "seasonal index" multiplier, which could
+    // reshape proportions but couldn't inject an absolute growth trajectory).
+    const monthlyRmByBrand = new Map<string, Map<string, number>>()
     for (const [brand, gsheet] of latestGsheetByBrand) {
       const monthRevMap = new Map<string, number>()
       for (const [col, monthKey] of Object.entries(COL_TO_MONTH)) {
         const val = Number((gsheet as any)[col] ?? 0)
         if (val > 0) monthRevMap.set(monthKey, val)
       }
-      const total = Array.from(monthRevMap.values()).reduce((a, b) => a + b, 0)
-      if (total > 0 && monthRevMap.size > 0) {
-        const avg = total / monthRevMap.size
-        const idxMap = new Map<string, number>()
-        for (const [m, v] of monthRevMap) idxMap.set(m, v / avg)
-        seasonalByBrand.set(brand, idxMap)
-      }
+      if (monthRevMap.size > 0) monthlyRmByBrand.set(brand, monthRevMap)
+    }
+
+    /** Convert a monthly RM figure into a per-week quantity (mirrors sd-compute.ts getForecastQty) */
+    function rmToWeeklyQty(monthlyRm: number, asp: number, monthKey: string): number {
+      if (asp <= 0 || monthlyRm <= 0) return 0
+      const month = parseInt(monthKey.slice(5, 7), 10)
+      const wksInMonth = MONTH_WEEKS[month] || 4
+      return Math.ceil((monthlyRm * 1000) / asp / wksInMonth)
     }
 
     // ── Generate forecasts in memory ─────────────────────────────────────────
@@ -149,25 +166,51 @@ export async function POST(req: NextRequest) {
         const asp = skuAspMap.get(sku) ?? 0
         const skuBrand = skuBrandMap.get(sku) ?? ''
         let forecastPoints = result.points
+        let modelStr = result.model
 
-        // Apply seasonal index if ASP > 0
+        // ── Growth-Hybrid (ASP > 0 only — see forecast-growth-hybrid-proposal.md) ──
+        //
+        // Anchor the trend on the project owner's own forward-looking monthly
+        // revenue forecast (sales_forecast), converted to weekly qty. The
+        // statistical model's role narrows to characterising the repeatable
+        // week-to-week "shape" (cyclical oscillation) and noise — it no longer
+        // drives the trend, which is where Holt's Linear was flattening out.
+        //
+        //   finalForecast(t) = backbone(t) + residualShape(t mod cycleLength)
+        //
+        // Falls back to the plain statistical forecast (no hybrid) when the
+        // brand has no usable sales_forecast submission, or when there isn't
+        // enough history to characterise a residual shape.
         if (asp > 0 && skuBrand) {
-          const idxMap = seasonalByBrand.get(skuBrand)
-          if (idxMap) {
-            forecastPoints = result.points.map(p => {
-              const idx = idxMap.get(p.weekStartDate.substring(0, 7))
-              if (!idx) return p
-              return {
+          const monthRevMap = monthlyRmByBrand.get(skuBrand)
+          const series = result.series
+          const residuals = result.residuals
+
+          if (monthRevMap && monthRevMap.size > 0 && series && residuals && series.length >= 8) {
+            const backbone = result.points.map(p =>
+              rmToWeeklyQty(monthRevMap.get(p.weekStartDate.substring(0, 7)) ?? 0, asp, p.weekStartDate.substring(0, 7))
+            )
+            const haveBackbone = backbone.some(v => v > 0)
+
+            if (haveBackbone) {
+              const cycleLength = detectCycleLength(series) ?? 7
+              const shape = averageResidualsByCyclePosition(residuals, cycleLength)
+              const tiledShape = tileShapeOverHorizon(shape, series.length, backbone.length)
+
+              const combined = backbone.map((b, h) => Math.max(0, Math.round(b + tiledShape[h])))
+              const { lower, upper } = growthHybridBounds(combined, residuals)
+
+              forecastPoints = result.points.map((p, h) => ({
                 ...p,
-                forecastQty: Math.max(0, Math.round(p.forecastQty * idx)),
-                lowerBound: Math.max(0, Math.round(p.lowerBound * idx)),
-                upperBound: Math.max(0, Math.round(p.upperBound * idx)),
-              }
-            })
+                forecastQty: combined[h],
+                lowerBound: lower[h],
+                upperBound: upper[h],
+              }))
+              modelStr = 'growth_hybrid'
+            }
           }
         }
 
-        const modelStr = asp > 0 ? `${result.model}_mgmt_seasonal` : result.model
         for (const p of forecastPoints) {
           allWeekDates.add(p.weekStartDate)
           allForecastRecords.push({
@@ -213,4 +256,4 @@ export async function POST(req: NextRequest) {
     console.error('regenerate-forecast error:', err)
     return NextResponse.json({ error: err.message ?? 'Unknown error' }, { status: 500 })
   }
-      }
+}
