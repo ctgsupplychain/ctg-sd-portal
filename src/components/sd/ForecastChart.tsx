@@ -119,9 +119,11 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       }
     })
 
+    const HISTORY_WEEKS = 26
     const toPoints = (map: Map<string, { qty: number; date: string }>): HistoryPoint[] =>
       Array.from(map.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
+        .slice(-HISTORY_WEEKS)
         .map(([key, v]) => ({ wk: key, qty: v.qty, date: v.date }))
 
     const fcPoints: ForecastPoint[] = (fcRes.data ?? []).map((f: any) => ({
