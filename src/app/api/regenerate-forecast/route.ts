@@ -187,19 +187,39 @@ export async function POST(req: NextRequest) {
           const series = result.series
           const residuals = result.residuals
 
-          if (monthRevMap && monthRevMap.size > 0 && series && residuals && series.length >= 8) {
+          if (monthRevMap && monthRevMap.size > 0 && series) {
             const backbone = result.points.map(p =>
               rmToWeeklyQty(monthRevMap.get(p.weekStartDate.substring(0, 7)) ?? 0, asp, p.weekStartDate.substring(0, 7))
             )
             const haveBackbone = backbone.some(v => v > 0)
 
-            if (haveBackbone) {
+            if (haveBackbone && residuals && series.length >= 8) {
+              // Enough history to characterise a repeatable cyclical "shape" —
+              // layer it on top of the Gsheet-anchored backbone.
               const cycleLength = detectCycleLength(series) ?? 7
               const shape = averageResidualsByCyclePosition(residuals, cycleLength)
               const tiledShape = tileShapeOverHorizon(shape, series.length, backbone.length)
 
               const combined = backbone.map((b, h) => Math.max(0, Math.round(b + tiledShape[h])))
               const { lower, upper } = growthHybridBounds(combined, residuals)
+
+              forecastPoints = result.points.map((p, h) => ({
+                ...p,
+                forecastQty: combined[h],
+                lowerBound: lower[h],
+                upperBound: upper[h],
+              }))
+              modelStr = 'growth_hybrid'
+            } else if (haveBackbone) {
+              // Not enough history yet to characterise a shape (< 8 weeks) —
+              // run on the Gsheet-anchored backbone alone. Confidence bounds
+              // widen faster (higher growthFactor) to reflect the lack of a
+              // statistically-grounded noise estimate; this narrows back to
+              // the standard band once the SKU accrues >= 8 weeks of history
+              // and graduates to the full shape-layered hybrid above.
+              const combined = backbone.map(b => Math.max(0, Math.round(b)))
+              const fallbackResiduals = residuals && residuals.length > 0 ? residuals : combined
+              const { lower, upper } = growthHybridBounds(combined, fallbackResiduals, 0.06)
 
               forecastPoints = result.points.map((p, h) => ({
                 ...p,
