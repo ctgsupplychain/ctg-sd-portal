@@ -94,11 +94,12 @@ export async function POST(req: NextRequest) {
 
     // 4. Management forecast (sales_forecast) for all relevant brands
     const relevantBrands = [...new Set(targetSkus.map(s => skuBrandMap.get(s)).filter(Boolean))]
-    const { data: gsheetRows } = await getSupabase()
+    const { data: gsheetRows, error: gsheetErr } = await getSupabase()
       .from('sales_forecast')
-      .select('brand, may_26, jun_26, jul_26, aug_26, sep_26, oct_26, nov_26, dec_26, jan_27, feb_27, mar_27, apr_27, submitted_at')
+      .select('brand, apr_26, may_26, jun_26, jul_26, aug_26, sep_26, oct_26, nov_26, dec_26, jan_27, feb_27, mar_27, submitted_at')
       .in('brand', relevantBrands)
       .order('submitted_at', { ascending: false })
+    if (gsheetErr) console.error('sales_forecast fetch error (growth-hybrid backbone unavailable):', gsheetErr)
 
     // Keep only latest submission per brand
     const latestGsheetByBrand = new Map<string, any>()
@@ -107,10 +108,10 @@ export async function POST(req: NextRequest) {
     }
 
     const COL_TO_MONTH: Record<string, string> = {
-      may_26: '2026-05', jun_26: '2026-06', jul_26: '2026-07',
+      apr_26: '2026-04', may_26: '2026-05', jun_26: '2026-06', jul_26: '2026-07',
       aug_26: '2026-08', sep_26: '2026-09', oct_26: '2026-10',
       nov_26: '2026-11', dec_26: '2026-12', jan_27: '2027-01',
-      feb_27: '2027-02', mar_27: '2027-03', apr_27: '2027-04',
+      feb_27: '2027-02', mar_27: '2027-03',
     }
 
     // Precompute monthly RM map per brand: 'YYYY-MM' -> forecasted revenue (RM)
