@@ -33,8 +33,35 @@ const TH = ({ children, right }: { children: React.ReactNode; right?: boolean })
   </th>
 )
 
+/** Build a display order where each L1 row is immediately followed by its L2 children. */
+function buildOrderedRows(rows: BomRow[], showL2: boolean): BomRow[] {
+  const l1Rows = rows.filter(r => r.bom_level === 1)
+
+  if (!showL2) return l1Rows
+
+  // Group L2 children by their parent_component_pn
+  const l2ByParent: Record<string, BomRow[]> = {}
+  rows.filter(r => r.bom_level === 2).forEach(r => {
+    const key = r.parent_component_pn ?? '__orphan__'
+    l2ByParent[key] = l2ByParent[key] ?? []
+    l2ByParent[key].push(r)
+  })
+
+  const ordered: BomRow[] = []
+  l1Rows.forEach(l1 => {
+    ordered.push(l1)
+    ordered.push(...(l2ByParent[l1.component_pn] ?? []))
+  })
+
+  // Append any orphaned L2s (parent not found among L1 rows)
+  const shown = new Set(ordered.map(r => r.component_pn))
+  rows.filter(r => r.bom_level === 2 && !shown.has(r.component_pn)).forEach(r => ordered.push(r))
+
+  return ordered
+}
+
 export default function BomTable({ rows, costMap, showL2, openPn, onToggle }: Props) {
-  const visible = rows.filter(r => showL2 || r.bom_level === 1)
+  const visible = buildOrderedRows(rows, showL2)
   const maxLanded = Math.max(...Object.values(costMap).map(c => c.ext_landed ?? 0), 1)
   const totLanded = Object.values(costMap).reduce((s, c) => s + (c.ext_landed ?? 0), 0)
 

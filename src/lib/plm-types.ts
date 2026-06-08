@@ -90,6 +90,7 @@ export interface BomRow {
   qty_per_fg: number
   gross_requirement: number
   uom: string
+  parent_component_pn?: string
   // joined
   current_revision?: string
   lifecycle_status?: LifecycleStatus

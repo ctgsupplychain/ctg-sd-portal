@@ -147,7 +147,4 @@ for (const rec of updateRecords) {
     })
 
   } catch (err: any) {
-    console.error('Master SKU upload error:', err)
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 })
-  }
-}
+    console.error('Master SKU upload error:
