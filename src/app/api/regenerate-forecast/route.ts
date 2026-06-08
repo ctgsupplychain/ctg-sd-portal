@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         const asp = skuAspMap.get(sku) ?? 0
         const skuBrand = skuBrandMap.get(sku) ?? ''
         let forecastPoints = result.points
-        let modelStr = result.model
+        let modelStr: string = result.model
 
         // ── Growth-Hybrid (ASP > 0 only — see forecast-growth-hybrid-proposal.md) ──
         //
