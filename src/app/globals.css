@@ -3,6 +3,20 @@
 @tailwind utilities;
 
 :root {
+  /* Signal design system tokens */
+  --cloud: #F4F2EE;
+  --sand: #E4DDD3;
+  --ink: #1F2937;
+  --ink-soft: #4B5563;
+  --teal: #0E5C56;
+  --teal-light: #DCEAE8;
+  --amber: #E8A33D;
+  --red: #C5453F;
+  --green: #2F9E68;
+  --font-heading: Cambria, Georgia, "Times New Roman", serif;
+  --font-body: Calibri, "Segoe UI", Tahoma, sans-serif;
+
+  /* Deprecated aliases — retained during migration, remove once unused */
   --color-dark: #1A2535;
   --color-accent: #048A81;
   --color-warn: #E07B39;
@@ -11,8 +25,9 @@
 }
 
 body {
-  background: #F0F2F5;
-  color: #101828;
+  background: var(--cloud);
+  color: var(--ink);
+  font-family: var(--font-body);
 }
 
 /* Custom scrollbar */

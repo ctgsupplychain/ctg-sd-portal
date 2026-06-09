@@ -4,7 +4,10 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/layout/Sidebar'
 import SDTable from '@/components/sd/SDTable'
+import ComponentSD from '@/components/sd/ComponentSD'
 import dynamic from 'next/dynamic'
+import { computeMRP } from '@/lib/bom-mrp'
+import type { ComponentMaster, ComponentMrpResult } from '@/lib/bom-mrp'
 
 const ForecastChart = dynamic(
   () => import('@/components/sd/ForecastChart'),
@@ -19,7 +22,6 @@ import type { SkuSdResult, WeekInfo } from '@/lib/sd-compute'
 import { loadDemandForecast } from '@/lib/forecasting/forecast-lookup'
 import { RefreshCw, Download } from 'lucide-react'
 
-// Get Monday date of current week (ISO: week starts Monday)
 function getCurrentMondayDate(): string {
   const now = new Date()
   const day = now.getDay() === 0 ? 7 : now.getDay()
@@ -45,6 +47,8 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [selectedSku, setSelectedSku] = useState<string>('')
+  const [mrpResults, setMrpResults] = useState<ComponentMrpResult[]>([])
+  const [fgPartNumber, setFgPartNumber] = useState<string>('')
 
   useEffect(() => {
     sessionStorage.setItem('ctg_last_brand', brand)
@@ -102,10 +106,10 @@ export default function ProjectPage() {
     const forecast = fcstData || null
 
     const { data: supplyData } = await supabase
-  .from('purchase_orders')
-  .select('*')
-  .in('sku', skuData?.map((s: any) => s.sku) || [])
-  .eq('status', 'Open')
+      .from('purchase_orders')
+      .select('*')
+      .in('sku', skuData?.map((s: any) => s.sku) || [])
+      .eq('status', 'Open')
 
     const { data: histData } = await supabase
       .from('historical_demand').select('sku, qty')
@@ -122,7 +126,6 @@ export default function ProjectPage() {
       histAvg[sku] = qtys.reduce((a, b) => a + b, 0) / qtys.length
     })
 
-    // Load statistical demand forecast (Tier 2 fallback for ASP=0 SKUs)
     const skuList = skuData?.map((s: any) => s.sku) || []
     const demandForecastMap = await loadDemandForecast(skuList)
 
@@ -138,8 +141,6 @@ export default function ProjectPage() {
       const uncommits: Record<string, number> = {}
       const wkLabels = new Set(wkList.map(w => w.label))
       skuSupply.forEach((s: any) => {
-        // Open POs whose receipt_wk has already passed (delayed, not yet received)
-        // roll forward into the current week so the qty doesn't disappear from view.
         const wk = (s.receipt_wk && wkLabels.has(s.receipt_wk)) ? s.receipt_wk : CURRENT_WK
         if (s.commit_status === 'Commit') commits[wk] = (commits[wk] || 0) + s.qty
         else uncommits[wk] = (uncommits[wk] || 0) + s.qty
@@ -147,7 +148,7 @@ export default function ProjectPage() {
       return computeSD({
         sku,
         onHand: latestStock[skuRaw.sku] || 0,
-        backorderQty: skuRaw.backorder_qty || 0,   // ← backorder units to fulfil this week
+        backorderQty: skuRaw.backorder_qty || 0,
         weeks: wkList,
         forecast,
         historicalAvg: histAvg[skuRaw.sku] || 0,
@@ -162,21 +163,113 @@ export default function ProjectPage() {
 
     setSkuResults(results)
     if (results.length > 0) setSelectedSku(results[0].sku.sku)
+
+    // ── BOM MRP ───────────────────────────────────────────────────────────────
+    if (projectData?.id) {
+      const { data: fgParts } = await supabase
+        .from('parts')
+        .select('part_number, description, master_sku_ref')
+        .eq('project_id', projectData.id)
+        .eq('category', 'FG')
+        .limit(1)
+
+      const fgPart = fgParts?.[0]
+      if (fgPart) {
+        setFgPartNumber(fgPart.part_number)
+
+        const { data: bomData } = await supabase
+          .from('bom_lines')
+          .select('id, parent_pn, child_pn, bom_level, qty_per, uom, child:parts!bom_lines_child_pn_fkey(part_number, description, category, uom, on_hand_qty)')
+          .eq('is_active', true)
+
+        const { data: projectParts } = await supabase
+          .from('parts').select('part_number').eq('project_id', projectData.id)
+
+        const projectPns = new Set(projectParts?.map((p: any) => p.part_number) || [])
+        projectPns.add(fgPart.part_number)
+
+        const bomLines = (bomData || [])
+          .filter((bl: any) => projectPns.has(bl.parent_pn) || projectPns.has(bl.child_pn))
+          .map((bl: any) => ({
+            partNumber: bl.child_pn,
+            parentPn: bl.parent_pn,
+            description: bl.child?.description || bl.child_pn,
+            category: bl.child?.category || 'RM',
+            bomLevel: bl.bom_level,
+            qtyPer: parseFloat(bl.qty_per),
+            uom: bl.uom,
+          }))
+
+        const compPns = [...new Set(bomLines.map((b: any) => b.partNumber as string))]
+
+        const { data: psData } = compPns.length > 0
+          ? await supabase.from('part_supplier')
+              .select('part_number, moq, spq, lead_time_wk, supplier_id')
+              .in('part_number', compPns).eq('is_preferred', true)
+          : { data: [] }
+
+        const supIds = [...new Set((psData || []).map((ps: any) => ps.supplier_id).filter(Boolean))]
+        const { data: supData } = supIds.length > 0
+          ? await supabase.from('plm_suppliers').select('id, name').in('id', supIds)
+          : { data: [] }
+
+        const supNameMap = new Map((supData || []).map((s: any) => [s.id, s.name]))
+        const psMap = new Map((psData || []).map((ps: any) => [ps.part_number, ps]))
+
+        const { data: partsData } = compPns.length > 0
+          ? await supabase.from('parts')
+              .select('part_number, description, category, uom, on_hand_qty')
+              .in('part_number', compPns)
+          : { data: [] }
+
+        const components: ComponentMaster[] = (partsData || []).map((p: any) => {
+          const ps = psMap.get(p.part_number)
+          return {
+            partNumber: p.part_number,
+            description: p.description,
+            category: p.category,
+            uom: p.uom,
+            onHandQty: p.on_hand_qty ?? 0,
+            supplier: ps?.supplier_id ? supNameMap.get(ps.supplier_id) ?? null : null,
+            moq: ps?.moq ?? null,
+            spq: ps?.spq ?? null,
+            leadTimeWk: ps?.lead_time_wk ?? null,
+          }
+        })
+
+        const fgSkuResult = results.find(r => r.sku.sku === fgPart.master_sku_ref) || results[0]
+        const fgDemandMap = new Map<string, number>()
+        if (fgSkuResult) {
+          fgSkuResult.weeks.forEach(w => fgDemandMap.set(w.wkLabel, w.forecastQty))
+        }
+
+        if (bomLines.length > 0 && components.length > 0) {
+          const mrp = computeMRP({
+            fgPartNumber: fgPart.part_number,
+            bomLines,
+            components,
+            fgWeeklyDemand: fgDemandMap,
+            weeks: wkList,
+            currentWkLabel: CURRENT_WK,
+          })
+          setMrpResults(mrp)
+        }
+      }
+    }
+
     setLoading(false)
   }
 
   const currentSkuResult = skuResults.find(s => s.sku.sku === selectedSku) || skuResults[0]
   const flag = currentSkuResult ? FLAG_DISPLAY[currentSkuResult.flag] : null
-
-  // Find next commit PO
   const nextCommit = currentSkuResult?.weeks.find(w => w.supplyCommit > 0)
 
   function getAlertMessage(s: SkuSdResult) {
-    const backorderNote = s.backorderQty > 0 ? ` Backorder: ${s.backorderQty.toLocaleString()} units pending fulfilment.` : ''
-    if (s.flag === 'STOCKOUT') return `${s.sku.sku} — stock depleted. On-Hand: ${s.onHand.toLocaleString()} units · WoC: ${s.weeksOfCover} wks.${backorderNote} No supply in pipeline. Raise a purchase order immediately.`
-    if (s.flag === 'RELEASE_PO') return `${s.sku.sku} — projected stockout at ${s.stockoutWk ?? '—'} (within LT window of ${s.sku.leadTimeWk} wks).${backorderNote} PO must be released by ${s.plannedPoReleaseDateWk ?? '—'} · Order qty: ${s.sku.moq.toLocaleString()} ${s.sku.uom} (MOQ).`
-    if (s.flag === 'PLAN_PO') return `${s.sku.sku} — projected stockout at ${s.stockoutWk ?? '—'} (beyond current LT window).${backorderNote} Plan PO release by ${s.plannedPoReleaseDateWk ?? '—'}.`
-    return `${s.sku.sku} — stock level healthy. WoC: ${s.weeksOfCover} wks.`
+    const bo = s.backorderQty > 0 ? ` Backorder: ${s.backorderQty.toLocaleString()} units pending.` : ''
+    if (s.flag === 'STOCKOUT')   return `${s.sku.sku} — stock depleted. WoC: ${s.weeksOfCover} wks.${bo} Raise a PO immediately.`
+    if (s.flag === 'RELEASE_PO') return `${s.sku.sku} — stockout at ${s.stockoutWk ?? '—'} (within LT ${s.sku.leadTimeWk} wks).${bo} Release PO by ${s.plannedPoReleaseDateWk ?? '—'} · MOQ: ${s.sku.moq.toLocaleString()} ${s.sku.uom}.`
+    if (s.flag === 'PLAN_PO')    return `${s.sku.sku} — stockout at ${s.stockoutWk ?? '—'} (beyond LT window).${bo} Plan PO by ${s.plannedPoReleaseDateWk ?? '—'}.`
+    return `${s.sku.sku} — healthy. WoC: ${s.weeksOfCover} wks.`
   }
 
   const alertBg: Record<string, string> = {
@@ -192,7 +285,6 @@ export default function ProjectPage() {
         userRole={profile?.role} brands={brands} activeBrand={brand} />
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Top bar */}
         <div className="bg-white border-b border-[#EAECF0] px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold text-[#101828]">Supply & Demand</h1>
@@ -215,8 +307,6 @@ export default function ProjectPage() {
             <div className="flex items-center justify-center h-40 text-[#667085] text-sm">Loading S&D data...</div>
           ) : (
             <>
-
-              {/* 4 Info Cards */}
               {currentSkuResult && flag && (
                 <div className="grid grid-cols-4 gap-4">
                   <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
@@ -243,8 +333,7 @@ export default function ProjectPage() {
                   <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
                     <div className="text-xs text-[#667085] mb-1">Status</div>
                     <div className="text-lg font-semibold flex items-center gap-1.5 mt-1" style={{ color: flag.color }}>
-                      <span>{flag.emoji}</span>
-                      <span>{flag.label}</span>
+                      <span>{flag.emoji}</span><span>{flag.label}</span>
                     </div>
                     <div className="text-xs mt-1 text-[#667085]">
                       {currentSkuResult.flag === 'RELEASE_PO' && `Release by ${currentSkuResult.plannedPoReleaseDateWk ?? '—'}`}
@@ -256,7 +345,6 @@ export default function ProjectPage() {
                 </div>
               )}
 
-              {/* Alert Banner */}
               {currentSkuResult && currentSkuResult.flag !== 'OK' && (
                 <div className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${alertBg[currentSkuResult.flag]}`}>
                   <p className="text-sm leading-relaxed">{getAlertMessage(currentSkuResult)}</p>
@@ -264,7 +352,6 @@ export default function ProjectPage() {
                 </div>
               )}
 
-              {/* Weekly S&D Table */}
               <div className="bg-white rounded-xl border border-[#EAECF0] p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <h2 className="text-sm font-semibold text-[#344054]">Weekly Supply & Demand</h2>
@@ -275,7 +362,6 @@ export default function ProjectPage() {
                   : <div className="text-sm text-[#667085] text-center py-8">No SKU data found for {brand}</div>}
               </div>
 
-              {/* Demand Forecast Chart */}
               {skuResults.length > 0 && (
                 <ForecastChart
                   selectedSku={selectedSku}
@@ -283,6 +369,19 @@ export default function ProjectPage() {
                   brand={brand}
                 />
               )}
+
+              {mrpResults.length > 0 && weeks.length > 0 && (() => {
+                const fgSkuResult = skuResults.find(s => s.sku.sku === selectedSku) || skuResults[0]
+                return (
+                  <ComponentSD
+                    results={mrpResults}
+                    weeks={weeks}
+                    currentWk={CURRENT_WK}
+                    fgSku={fgSkuResult?.sku.sku ?? fgPartNumber}
+                    fgDescription={fgSkuResult?.sku.description ?? ''}
+                  />
+                )
+              })()}
             </>
           )}
         </div>

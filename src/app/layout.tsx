@@ -13,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
+      <body style={{ fontFamily: "var(--font-body)" }}>
         {children}
       </body>
     </html>

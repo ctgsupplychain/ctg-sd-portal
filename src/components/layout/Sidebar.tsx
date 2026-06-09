@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import clsx from 'clsx'
 import {
   LayoutDashboard, Package, BarChart3, Bell, LogOut,
-  FileInput, RefreshCw, Database, TrendingUp, GitMerge, ClipboardList
+  FileInput, RefreshCw, Database, TrendingUp, GitMerge, ClipboardList, Layers
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -116,6 +116,15 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
             href="/planned-po"
             active={pathname === '/planned-po'}
             onClick={() => router.push('/planned-po')}
+          />
+        )}
+        {userRole === 'supply_chain' && (
+          <NavItem
+            icon={<Layers size={15} />}
+            label="Part Master"
+            href="/part-master"
+            active={pathname === '/part-master'}
+            onClick={() => router.push('/part-master')}
           />
         )}
         <NavItem

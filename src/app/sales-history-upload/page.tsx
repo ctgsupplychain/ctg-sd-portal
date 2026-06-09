@@ -34,10 +34,13 @@ interface UploadResult extends UploadApiResult {
 }
 
 const MODEL_LABELS: Record<string, string> = {
-  holt_winters: 'Holt-Winters', wma: 'Wtd Moving Avg', avg: 'Simple Avg',
+  holts_linear: "Holt's Linear", ses: 'SES', avg: 'Simple Avg',
+  // legacy labels — keep for rows generated before the June 2026 engine update
+  holt_winters: "Holt's Linear", wma: 'SES',
 }
 const MODEL_COLORS: Record<string, string> = {
-  holt_winters: 'bg-teal-100 text-teal-800', wma: 'bg-blue-100 text-blue-800', avg: 'bg-gray-100 text-gray-600',
+  holts_linear: 'bg-teal-100 text-teal-800', ses: 'bg-blue-100 text-blue-800', avg: 'bg-gray-100 text-gray-600',
+  holt_winters: 'bg-teal-100 text-teal-800', wma: 'bg-blue-100 text-blue-800',
 }
 
 export default function SalesHistoryUploadPage() {
