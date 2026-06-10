@@ -352,8 +352,8 @@ function MrpRow({
               'text-center px-1.5 py-1.5 border-b border-r border-[#EAECF0] text-xs tabular-nums',
               meta.bg,
               meta.cellColor,
-              isCurrent && rowType !== 'release' && 'bg-[#FFFBEB]',
-              val === 0 && rowType !== 'release' && '!text-[#D0D5DD]'
+              isCurrent && 'bg-[#FFFBEB]',
+              val === 0 && '!text-[#D0D5DD]'
             )}
           >
             {fmt(val)}
