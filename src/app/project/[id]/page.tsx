@@ -96,8 +96,10 @@ export default function ProjectPage() {
     })
     if (stockDates[0]) setLastUpdated(stockDates[0])
 
-    const { data: projectData } = await supabase
-      .from('projects').select('id').eq('brand', brand).limit(1).single()
+    const { data: projectRows } = await supabase
+      .from('projects').select('id').eq('brand', brand)
+    const projectData = projectRows?.[0] ?? null
+    const allProjectIds = (projectRows || []).map((r: any) => r.id)
 
     const { data: fcstData } = await supabase
       .from('sales_forecast').select('*').eq('project_id', projectData?.id || '')
@@ -165,15 +167,17 @@ export default function ProjectPage() {
     if (results.length > 0) setSelectedSku(results[0].sku.sku)
 
     // ── BOM MRP ───────────────────────────────────────────────────────────────
-    if (projectData?.id) {
+    if (allProjectIds.length > 0) {
       const { data: fgParts } = await supabase
         .from('parts')
         .select('part_number, description, master_sku_ref')
-        .eq('project_id', projectData.id)
+        .in('project_id', allProjectIds)
         .eq('category', 'FG')
-        .limit(1)
 
-      const fgPart = fgParts?.[0]
+      // Pick the FG part whose master_sku_ref matches the currently selected SKU, else first FG with a ref
+      const fgPart = (fgParts || []).find((p: any) => p.master_sku_ref === results[0]?.sku.sku)
+        ?? (fgParts || []).find((p: any) => p.master_sku_ref != null)
+        ?? fgParts?.[0]
       if (fgPart) {
         setFgPartNumber(fgPart.part_number)
 
@@ -183,7 +187,7 @@ export default function ProjectPage() {
           .eq('is_active', true)
 
         const { data: projectParts } = await supabase
-          .from('parts').select('part_number').eq('project_id', projectData.id)
+          .from('parts').select('part_number').in('project_id', allProjectIds)
 
         const projectPns = new Set(projectParts?.map((p: any) => p.part_number) || [])
         projectPns.add(fgPart.part_number)
