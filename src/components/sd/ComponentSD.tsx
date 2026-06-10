@@ -33,9 +33,9 @@ function fmt(n: number): string {
 }
 
 // Row styles matching SDTable
-type MrpRow = 'gross' | 'net' | 'po' | 'release'
+type MrpRowType = 'gross' | 'net' | 'po' | 'release'
 
-const ROW_META: Record<MrpRow, { label: string; bg: string; labelColor: string; cellColor: string }> = {
+const ROW_META: Record<MrpRowType, { label: string; bg: string; labelColor: string; cellColor: string }> = {
   gross:   { label: 'Gross Req',   bg: 'bg-[#F0FAF0]', labelColor: 'text-[#667085]', cellColor: 'text-[#344054]' },
   net:     { label: 'Net Req',     bg: 'bg-[#F5F5F5]', labelColor: 'text-[#667085]', cellColor: 'text-[#344054]' },
   po:      { label: 'Planned PO',  bg: 'bg-[#EFF6FF]', labelColor: 'text-[#667085]', cellColor: 'text-[#1849A9] font-medium' },
@@ -272,7 +272,7 @@ function MrpRow({
   label, rowType, values, flags, releaseWks, weeks, currentWk, missingLt,
 }: {
   label: string
-  rowType: MrpRow
+  rowType: MrpRowType
   values: number[]
   flags?: (string | null)[]
   releaseWks?: (string | null)[]
