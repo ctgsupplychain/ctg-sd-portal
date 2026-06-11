@@ -17,7 +17,8 @@ interface UploadResult {
 interface PurchaseOrder {
   id: number
   po_number: string
-  sku: string
+  sku: string | null
+  part_number: string | null
   brand: string | null
   supplier_name: string | null
   qty: number
@@ -74,7 +75,7 @@ export default function SupplyInputPage() {
     setListLoading(true); setListError(null)
     const { data, error: err } = await supabase
       .from('purchase_orders')
-      .select('id, po_number, sku, brand, supplier_name, qty, qty_shipped, balance_qty, unit_price, delivery_date, receipt_wk, status, commit_status, notes, updated_at')
+      .select('id, po_number, sku, part_number, brand, supplier_name, qty, qty_shipped, balance_qty, unit_price, delivery_date, receipt_wk, status, commit_status, notes, updated_at')
       .order('updated_at', { ascending: false })
       .limit(1000)
     if (err) { setListError(err.message); setListLoading(false); return }
@@ -195,7 +196,7 @@ export default function SupplyInputPage() {
   const filtered = useMemo(() => pos.filter(p => {
     const q = search.toLowerCase()
     return (
-      (!search || p.po_number.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.supplier_name ?? '').toLowerCase().includes(q)) &&
+      (!search || p.po_number.toLowerCase().includes(q) || (p.sku ?? '').toLowerCase().includes(q) || (p.part_number ?? '').toLowerCase().includes(q) || (p.supplier_name ?? '').toLowerCase().includes(q)) &&
       (statusFilter === 'All' || p.status === statusFilter)
     )
   }), [pos, search, statusFilter])
@@ -425,7 +426,7 @@ export default function SupplyInputPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['PO Number', 'SKU', 'Supplier', 'Qty', 'Shipped', 'Balance', 'Unit Price', 'Delivery Date', 'Receipt Wk', 'Status'].map((h, i) => (
+                  {['PO Number', 'SKU / Part No', 'Supplier', 'Qty', 'Shipped', 'Balance', 'Unit Price', 'Delivery Date', 'Receipt Wk', 'Status'].map((h, i) => (
                     <th key={h} className={`px-3 py-2.5 font-medium text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap ${i < 3 ? 'text-left' : 'text-right'}`}>{h}</th>
                   ))}
                 </tr>
@@ -442,9 +443,12 @@ export default function SupplyInputPage() {
                           <span className="ml-2 inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 align-middle">Delayed</span>
                         )}
                       </td>
-                      {/* SKU — read only */}
+                      {/* SKU / Part Number — read only */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-[11px] text-gray-700">{p.sku}</span>
+                        <span className="font-mono text-[11px] text-gray-700">{p.sku ?? p.part_number ?? '—'}</span>
+                        {p.part_number && !p.sku && (
+                          <span className="ml-1.5 inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 align-middle">Component</span>
+                        )}
                         {p.brand && <p className="text-[10px] text-gray-400 mt-0.5">{p.brand}</p>}
                       </td>
                       {/* Supplier — editable */}
