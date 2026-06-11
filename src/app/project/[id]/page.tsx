@@ -166,7 +166,7 @@ export default function ProjectPage() {
     setSkuResults(results)
     if (results.length > 0) setSelectedSku(results[0].sku.sku)
 
-    // ── BOM MRP ───────────────────────────────────────────────────────────────
+    // ââ BOM MRP âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     if (allProjectIds.length > 0) {
       const { data: fgParts } = await supabase
         .from('parts')
@@ -183,7 +183,7 @@ export default function ProjectPage() {
 
         const { data: bomData } = await supabase
           .from('bom_lines')
-          .select('id, parent_pn, child_pn, bom_level, qty_per, uom, child:parts!bom_lines_child_pn_fkey(part_number, description, category, uom, on_hand_qty)')
+          .select('id, parent_pn, child_pn, bom_level, qty_per, uom')
           .eq('is_active', true)
 
         const { data: projectParts } = await supabase
@@ -197,8 +197,8 @@ export default function ProjectPage() {
           .map((bl: any) => ({
             partNumber: bl.child_pn,
             parentPn: bl.parent_pn,
-            description: bl.child?.description || bl.child_pn,
-            category: bl.child?.category || 'RM',
+            description: bl.child_pn,
+            category: 'RM',
             bomLevel: bl.bom_level,
             qtyPer: parseFloat(bl.qty_per),
             uom: bl.uom,
@@ -247,8 +247,6 @@ export default function ProjectPage() {
           fgSkuResult.weeks.forEach(w => fgDemandMap.set(w.wkLabel, w.forecastQty))
         }
 
-        console.log('[MRP debug] fgPart:', fgPart?.part_number, 'bomLines:', bomLines.length, 'components:', components.length, 'compPns:', compPns)
-
         if (bomLines.length > 0 && components.length > 0) {
           const mrp = computeMRP({
             fgPartNumber: fgPart.part_number,
@@ -272,10 +270,10 @@ export default function ProjectPage() {
 
   function getAlertMessage(s: SkuSdResult) {
     const bo = s.backorderQty > 0 ? ` Backorder: ${s.backorderQty.toLocaleString()} units pending.` : ''
-    if (s.flag === 'STOCKOUT')   return `${s.sku.sku} — stock depleted. WoC: ${s.weeksOfCover} wks.${bo} Raise a PO immediately.`
-    if (s.flag === 'RELEASE_PO') return `${s.sku.sku} — stockout at ${s.stockoutWk ?? '—'} (within LT ${s.sku.leadTimeWk} wks).${bo} Release PO by ${s.plannedPoReleaseDateWk ?? '—'} · MOQ: ${s.sku.moq.toLocaleString()} ${s.sku.uom}.`
-    if (s.flag === 'PLAN_PO')    return `${s.sku.sku} — stockout at ${s.stockoutWk ?? '—'} (beyond LT window).${bo} Plan PO by ${s.plannedPoReleaseDateWk ?? '—'}.`
-    return `${s.sku.sku} — healthy. WoC: ${s.weeksOfCover} wks.`
+    if (s.flag === 'STOCKOUT')   return `${s.sku.sku} â stock depleted. WoC: ${s.weeksOfCover} wks.${bo} Raise a PO immediately.`
+    if (s.flag === 'RELEASE_PO') return `${s.sku.sku} â stockout at ${s.stockoutWk ?? 'â'} (within LT ${s.sku.leadTimeWk} wks).${bo} Release PO by ${s.plannedPoReleaseDateWk ?? 'â'} Â· MOQ: ${s.sku.moq.toLocaleString()} ${s.sku.uom}.`
+    if (s.flag === 'PLAN_PO')    return `${s.sku.sku} â stockout at ${s.stockoutWk ?? 'â'} (beyond LT window).${bo} Plan PO by ${s.plannedPoReleaseDateWk ?? 'â'}.`
+    return `${s.sku.sku} â healthy. WoC: ${s.weeksOfCover} wks.`
   }
 
   const alertBg: Record<string, string> = {
@@ -325,12 +323,12 @@ export default function ProjectPage() {
                     <div className="text-2xl font-semibold" style={{
                       color: currentSkuResult.weeksOfCover < 0 ? '#B42318' : currentSkuResult.weeksOfCover < 4 ? '#B54708' : '#027A48'
                     }}>{currentSkuResult.weeksOfCover}</div>
-                    <div className="text-xs mt-1 text-[#667085]">Target: ≥ 8 wks</div>
+                    <div className="text-xs mt-1 text-[#667085]">Target: â¥ 8 wks</div>
                   </div>
                   <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
                     <div className="text-xs text-[#667085] mb-1">Next PO (Commit)</div>
                     <div className="text-2xl font-semibold text-[#101828]">
-                      {nextCommit ? nextCommit.supplyCommit.toLocaleString() : '—'}
+                      {nextCommit ? nextCommit.supplyCommit.toLocaleString() : 'â'}
                     </div>
                     <div className="text-xs mt-1 text-[#667085]">
                       {nextCommit ? `ETA: ${nextCommit.wkLabel}` : 'No open PO'}
@@ -342,8 +340,8 @@ export default function ProjectPage() {
                       <span>{flag.emoji}</span><span>{flag.label}</span>
                     </div>
                     <div className="text-xs mt-1 text-[#667085]">
-                      {currentSkuResult.flag === 'RELEASE_PO' && `Release by ${currentSkuResult.plannedPoReleaseDateWk ?? '—'}`}
-                      {currentSkuResult.flag === 'PLAN_PO' && `Plan by ${currentSkuResult.plannedPoReleaseDateWk ?? '—'}`}
+                      {currentSkuResult.flag === 'RELEASE_PO' && `Release by ${currentSkuResult.plannedPoReleaseDateWk ?? 'â'}`}
+                      {currentSkuResult.flag === 'PLAN_PO' && `Plan by ${currentSkuResult.plannedPoReleaseDateWk ?? 'â'}`}
                       {currentSkuResult.flag === 'STOCKOUT' && 'Urgent action required'}
                       {currentSkuResult.flag === 'OK' && 'No action needed'}
                     </div>
@@ -354,7 +352,7 @@ export default function ProjectPage() {
               {currentSkuResult && currentSkuResult.flag !== 'OK' && (
                 <div className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${alertBg[currentSkuResult.flag]}`}>
                   <p className="text-sm leading-relaxed">{getAlertMessage(currentSkuResult)}</p>
-                  <span className="text-xs font-medium whitespace-nowrap cursor-pointer opacity-70 hover:opacity-100">View PO →</span>
+                  <span className="text-xs font-medium whitespace-nowrap cursor-pointer opacity-70 hover:opacity-100">View PO â</span>
                 </div>
               )}
 
