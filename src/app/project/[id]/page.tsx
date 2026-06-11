@@ -247,6 +247,8 @@ export default function ProjectPage() {
           fgSkuResult.weeks.forEach(w => fgDemandMap.set(w.wkLabel, w.forecastQty))
         }
 
+        console.log('[MRP debug] fgPart:', fgPart?.part_number, 'bomLines:', bomLines.length, 'components:', components.length, 'compPns:', compPns)
+
         if (bomLines.length > 0 && components.length > 0) {
           const mrp = computeMRP({
             fgPartNumber: fgPart.part_number,
