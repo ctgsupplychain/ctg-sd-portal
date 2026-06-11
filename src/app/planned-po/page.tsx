@@ -39,6 +39,21 @@ interface PlannedPoRow {
   note: string
 }
 
+interface ComponentPoRow {
+  id: number
+  po_number: string
+  part_number: string
+  brand: string | null
+  company: string | null
+  supplier_name: string | null
+  qty: number
+  balance_qty: number | null
+  delivery_date: string | null
+  receipt_wk: string | null
+  commit_status: string | null
+  status: string
+}
+
 // ── component ─────────────────────────────────────────────────────────────────
 
 export default function PlannedPoPage() {
@@ -47,8 +62,10 @@ export default function PlannedPoPage() {
   const [profile, setProfile] = useState<any>(null)
   const [brands, setBrands] = useState<string[]>([])
   const [rows, setRows] = useState<PlannedPoRow[]>([])
+  const [componentPos, setComponentPos] = useState<ComponentPoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filterFlag, setFilterFlag] = useState<'ALL' | 'RELEASE_PO' | 'PLAN_PO'>('ALL')
+  const [filterCompany, setFilterCompany] = useState<string>('All')
   const [snapshotDate, setSnapshotDate] = useState('')
 
   useEffect(() => { loadAll() }, [])
@@ -61,7 +78,7 @@ export default function PlannedPoPage() {
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(prof)
 
-    // ── 1. Determine accessible brands ────────────────────────────────────────
+    // ── 1. Determine accessible brands ───────────────────────────────────────
     const isAdmin = prof?.role === 'admin' || prof?.role === 'supply_chain'
     let accessibleBrands: string[] = []
     if (isAdmin) {
@@ -224,6 +241,16 @@ export default function PlannedPoPage() {
     })
 
     setRows(plannedRows)
+
+    // ── 8. Load open component POs ────────────────────────────────────────────
+    const { data: compPoData } = await supabase
+      .from('purchase_orders')
+      .select('id, po_number, part_number, brand, company, supplier_name, qty, balance_qty, delivery_date, receipt_wk, commit_status, status')
+      .not('part_number', 'is', null)
+      .eq('status', 'Open')
+      .order('receipt_wk', { ascending: true })
+
+    setComponentPos((compPoData ?? []) as ComponentPoRow[])
     setLoading(false)
   }
 
@@ -257,6 +284,12 @@ export default function PlannedPoPage() {
   const visibleRows = filterFlag === 'ALL' ? rows : rows.filter(r => r.flag === filterFlag)
   const releaseCount = rows.filter(r => r.flag === 'RELEASE_PO').length
   const planCount = rows.filter(r => r.flag === 'PLAN_PO').length
+
+  // Component PO filter
+  const companies = ['All', ...Array.from(new Set(componentPos.map(r => r.company ?? r.brand ?? '—').filter(Boolean))).sort()]
+  const visibleCompPos = filterCompany === 'All'
+    ? componentPos
+    : componentPos.filter(r => (r.company ?? r.brand) === filterCompany)
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F0F2F5]">
@@ -404,39 +437,4 @@ export default function PlannedPoPage() {
                             {row.releaseDateLabel !== '—' && (
                               <div className="text-[#98A2B3] text-[10px]">{row.releaseDateLabel}</div>
                             )}
-                          </td>
-
-                          {/* Order qty */}
-                          <td className="px-4 py-3 text-right text-[#101828] font-medium">
-                            {row.orderQty.toLocaleString()}
-                            <span className="text-[#98A2B3] font-normal ml-1">{row.uom}</span>
-                          </td>
-
-                          {/* Note tooltip */}
-                          <td className="px-4 py-3 text-center">
-                            <span
-                              title={row.note}
-                              className="text-[#98A2B3] cursor-help hover:text-[#667085] text-sm"
-                            >ⓘ</span>
-                          </td>
-
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {rows.length > 0 && (
-                <p className="text-[11px] text-[#98A2B3]">
-                  Order qty = MOQ from Master SKU. Safety stock buffer not yet configured — release dates may shift earlier once SS is defined per SKU.
-                  Release by date = Stockout week − Lead time − 1 wk (ops buffer).
-                </p>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+ 
