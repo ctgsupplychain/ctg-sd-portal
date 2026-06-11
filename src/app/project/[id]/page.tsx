@@ -166,7 +166,7 @@ export default function ProjectPage() {
     setSkuResults(results)
     if (results.length > 0) setSelectedSku(results[0].sku.sku)
 
-    // ââ BOM MRP âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    // BOM MRP
     if (allProjectIds.length > 0) {
       const { data: fgParts } = await supabase
         .from('parts')
@@ -174,7 +174,6 @@ export default function ProjectPage() {
         .in('project_id', allProjectIds)
         .eq('category', 'FG')
 
-      // Pick the FG part whose master_sku_ref matches the currently selected SKU, else first FG with a ref
       const fgPart = (fgParts || []).find((p: any) => p.master_sku_ref === results[0]?.sku.sku)
         ?? (fgParts || []).find((p: any) => p.master_sku_ref != null)
         ?? fgParts?.[0]
@@ -198,7 +197,7 @@ export default function ProjectPage() {
             partNumber: bl.child_pn,
             parentPn: bl.parent_pn,
             description: bl.child_pn,
-            category: 'RM',
+            category: 'RM' as const,
             bomLevel: bl.bom_level,
             qtyPer: parseFloat(bl.qty_per),
             uom: bl.uom,
@@ -270,10 +269,10 @@ export default function ProjectPage() {
 
   function getAlertMessage(s: SkuSdResult) {
     const bo = s.backorderQty > 0 ? ` Backorder: ${s.backorderQty.toLocaleString()} units pending.` : ''
-    if (s.flag === 'STOCKOUT')   return `${s.sku.sku} â stock depleted. WoC: ${s.weeksOfCover} wks.${bo} Raise a PO immediately.`
-    if (s.flag === 'RELEASE_PO') return `${s.sku.sku} â stockout at ${s.stockoutWk ?? 'â'} (within LT ${s.sku.leadTimeWk} wks).${bo} Release PO by ${s.plannedPoReleaseDateWk ?? 'â'} Â· MOQ: ${s.sku.moq.toLocaleString()} ${s.sku.uom}.`
-    if (s.flag === 'PLAN_PO')    return `${s.sku.sku} â stockout at ${s.stockoutWk ?? 'â'} (beyond LT window).${bo} Plan PO by ${s.plannedPoReleaseDateWk ?? 'â'}.`
-    return `${s.sku.sku} â healthy. WoC: ${s.weeksOfCover} wks.`
+    if (s.flag === 'STOCKOUT')   return `${s.sku.sku} — stock depleted. WoC: ${s.weeksOfCover} wks.${bo} Raise a PO immediately.`
+    if (s.flag === 'RELEASE_PO') return `${s.sku.sku} — stockout at ${s.stockoutWk ?? '—'} (within LT ${s.sku.leadTimeWk} wks).${bo} Release PO by ${s.plannedPoReleaseDateWk ?? '—'} · MOQ: ${s.sku.moq.toLocaleString()} ${s.sku.uom}.`
+    if (s.flag === 'PLAN_PO')    return `${s.sku.sku} — stockout at ${s.stockoutWk ?? '—'} (beyond LT window).${bo} Plan PO by ${s.plannedPoReleaseDateWk ?? '—'}.`
+    return `${s.sku.sku} — healthy. WoC: ${s.weeksOfCover} wks.`
   }
 
   const alertBg: Record<string, string> = {
@@ -291,7 +290,7 @@ export default function ProjectPage() {
 
         <div className="bg-white border-b border-[#EAECF0] px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold text-[#101828]">Supply & Demand</h1>
+            <h1 className="text-sm font-semibold text-[#101828]">Supply &amp; Demand</h1>
             <span className="bg-[#ECFDF3] text-[#027A48] border border-[#ABEFC6] text-xs px-2.5 py-1 rounded-full font-medium">{brand}</span>
             <span className="bg-[#F2F4F7] text-[#667085] text-xs px-2.5 py-1 rounded-full">{CURRENT_WK} 2026</span>
           </div>
@@ -308,7 +307,7 @@ export default function ProjectPage() {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-[#667085] text-sm">Loading S&D data...</div>
+            <div className="flex items-center justify-center h-40 text-[#667085] text-sm">Loading S&amp;D data...</div>
           ) : (
             <>
               {currentSkuResult && flag && (
@@ -323,12 +322,12 @@ export default function ProjectPage() {
                     <div className="text-2xl font-semibold" style={{
                       color: currentSkuResult.weeksOfCover < 0 ? '#B42318' : currentSkuResult.weeksOfCover < 4 ? '#B54708' : '#027A48'
                     }}>{currentSkuResult.weeksOfCover}</div>
-                    <div className="text-xs mt-1 text-[#667085]">Target: â¥ 8 wks</div>
+                    <div className="text-xs mt-1 text-[#667085]">Target: &ge; 8 wks</div>
                   </div>
                   <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
                     <div className="text-xs text-[#667085] mb-1">Next PO (Commit)</div>
                     <div className="text-2xl font-semibold text-[#101828]">
-                      {nextCommit ? nextCommit.supplyCommit.toLocaleString() : 'â'}
+                      {nextCommit ? nextCommit.supplyCommit.toLocaleString() : '—'}
                     </div>
                     <div className="text-xs mt-1 text-[#667085]">
                       {nextCommit ? `ETA: ${nextCommit.wkLabel}` : 'No open PO'}
@@ -340,8 +339,8 @@ export default function ProjectPage() {
                       <span>{flag.emoji}</span><span>{flag.label}</span>
                     </div>
                     <div className="text-xs mt-1 text-[#667085]">
-                      {currentSkuResult.flag === 'RELEASE_PO' && `Release by ${currentSkuResult.plannedPoReleaseDateWk ?? 'â'}`}
-                      {currentSkuResult.flag === 'PLAN_PO' && `Plan by ${currentSkuResult.plannedPoReleaseDateWk ?? 'â'}`}
+                      {currentSkuResult.flag === 'RELEASE_PO' && `Release by ${currentSkuResult.plannedPoReleaseDateWk ?? '—'}`}
+                      {currentSkuResult.flag === 'PLAN_PO' && `Plan by ${currentSkuResult.plannedPoReleaseDateWk ?? '—'}`}
                       {currentSkuResult.flag === 'STOCKOUT' && 'Urgent action required'}
                       {currentSkuResult.flag === 'OK' && 'No action needed'}
                     </div>
@@ -352,13 +351,13 @@ export default function ProjectPage() {
               {currentSkuResult && currentSkuResult.flag !== 'OK' && (
                 <div className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${alertBg[currentSkuResult.flag]}`}>
                   <p className="text-sm leading-relaxed">{getAlertMessage(currentSkuResult)}</p>
-                  <span className="text-xs font-medium whitespace-nowrap cursor-pointer opacity-70 hover:opacity-100">View PO â</span>
+                  <span className="text-xs font-medium whitespace-nowrap cursor-pointer opacity-70 hover:opacity-100">View PO →</span>
                 </div>
               )}
 
               <div className="bg-white rounded-xl border border-[#EAECF0] p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-sm font-semibold text-[#344054]">Weekly Supply & Demand</h2>
+                  <h2 className="text-sm font-semibold text-[#344054]">Weekly Supply &amp; Demand</h2>
                   <span className="text-xs text-[#98A2B3]">Rolling 52 weeks from {CURRENT_WK}</span>
                 </div>
                 {skuResults.length > 0 && weeks.length > 0
