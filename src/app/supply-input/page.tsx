@@ -221,7 +221,6 @@ export default function SupplyInputPage() {
     align?: 'left' | 'right'
     display: React.ReactNode
     inputType?: string
-  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
     selectOptions?: string[]
   }) {
     const isEditing = editingCell?.id === id && editingCell?.field === field
@@ -245,7 +244,7 @@ export default function SupplyInputPage() {
               <input
                 ref={inputRef as React.RefObject<HTMLInputElement>}
                 type={inputType}
-                inputMode={inputMode}
+                inputMode={inputType === 'text' ? 'numeric' : inputType === 'decimal' ? 'decimal' : undefined}
                 value={editValue}
                 onChange={e => setEditValue(e.target.value)}
                 onKeyDown={handleKeyDown}
