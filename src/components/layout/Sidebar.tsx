@@ -32,11 +32,11 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
   const isAdmin = userRole === 'admin' || userRole === 'supply_chain'
 
   return (
-    <div className="w-52 min-w-52 bg-[#1A2535] flex flex-col h-full">
+    <div className="w-52 min-w-52 flex flex-col h-full" style={{ background: '#1F2937' }}>
       {/* Header */}
-      <div className="px-4 py-5 border-b border-white/10">
-        <div className="text-white font-semibold text-sm tracking-wide">CTG Supply Chain</div>
-        <div className="text-white/40 text-xs mt-0.5">Project Owner Portal</div>
+      <div className="px-4 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="text-white font-semibold text-sm tracking-wide" style={{ fontFamily: 'Cambria, Georgia, serif' }}>CTG Supply Chain</div>
+        <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Calibri, Segoe UI, sans-serif' }}>S&D Portal</div>
       </div>
 
       {/* Nav */}
@@ -155,7 +155,7 @@ export default function Sidebar({ userEmail, userName, userRole, brands = [], ac
       {/* User footer */}
       <div className="px-4 py-4 border-t border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-[#048A81]/30 flex items-center justify-center text-[#048A81] text-xs font-semibold flex-shrink-0">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0" style={{ background: 'rgba(14,92,86,0.35)', color: '#DCEAE8' }}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">
@@ -181,15 +181,5 @@ function NavItem({ icon, label, href, active, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={clsx(
-        'w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-all border-l-2',
-        active
-          ? 'bg-white/8 text-white border-[#048A81] font-medium'
-          : 'text-white/50 border-transparent hover:text-white/80 hover:bg-white/5'
-      )}
-    >
-      <span>{icon}</span>
-      <span className="truncate">{label}</span>
-    </button>
-  )
-}
+      style={active ? { borderLeft: '2px solid #0E5C56', background: 'rgba(14,92,86,0.15)', color: '#FFFFFF' } : { borderLeft: '2px solid transparent', color: 'rgba(255,255,255,0.5)' }}
+   

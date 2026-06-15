@@ -260,21 +260,21 @@ export default function DashboardPage() {
   ] : []
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#F4F6F5', fontFamily: "'Inter', sans-serif" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F4F2EE', fontFamily: 'Calibri, "Segoe UI", sans-serif' }}>
       <Sidebar userEmail={profile?.email} userName={profile?.full_name} userRole={profile?.role} brands={brands} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div style={{ background: '#fff', borderBottom: '0.5px solid rgba(15,40,30,0.09)', padding: '10px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ background: '#FFFFFF', borderBottom: '1px solid #E4DDD3', padding: '10px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#16201C', letterSpacing: '-0.01em' }}>Inventory control tower</div>
-            <div style={{ fontSize: 11.5, color: '#8B948F', marginTop: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#1F2937', letterSpacing: '-0.01em', fontFamily: 'Cambria, Georgia, serif' }}>Inventory control tower</div>
+            <div style={{ fontSize: 11.5, color: '#4B5563', marginTop: 1 }}>
               {loading ? 'Loading…' : `WMS snapshot ${kpis?.snapshotDate ?? '—'} · demand from statistical forecast`}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <span style={{ fontSize: 12, color: '#5C6862', background: '#fff', border: '0.5px solid rgba(15,40,30,0.16)', borderRadius: 8, padding: '5px 13px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }}/>All brands
+            <span style={{ fontSize: 12, color: '#4B5563', background: '#FFFFFF', border: '1px solid #E4DDD3', borderRadius: 8, padding: '5px 13px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2F9E68', display: 'inline-block' }}/>All brands
             </span>
-            <span style={{ fontSize: 12, color: '#5C6862', background: '#fff', border: '0.5px solid rgba(15,40,30,0.16)', borderRadius: 8, padding: '5px 13px' }}>Next 12 weeks</span>
+            <span style={{ fontSize: 12, color: '#4B5563', background: '#FFFFFF', border: '1px solid #E4DDD3', borderRadius: 8, padding: '5px 13px' }}>Next 12 weeks</span>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto" style={{ padding: '20px 24px 48px' }}>
@@ -284,14 +284,14 @@ export default function DashboardPage() {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 14 }}>
                 {tiles.map(t => {
-                  const bg = t.cls === 'red' ? '#FBEAEA' : t.cls === 'amber' ? '#FBEFD9' : '#fff'
-                  const tc = t.cls === 'red' ? '#A32D2D' : t.cls === 'amber' ? '#85530B' : '#16201C'
-                  const sc = t.cls === 'red' ? '#A32D2D' : t.cls === 'amber' ? '#85530B' : '#8B948F'
-                  const bdr = t.cls === 'neutral' ? '0.5px solid rgba(15,40,30,0.09)' : 'none'
+                  const bg = t.cls === 'red' ? '#FAEAEA' : t.cls === 'amber' ? '#FEF3E2' : '#FFFFFF'
+                  const tc = t.cls === 'red' ? '#C5453F' : t.cls === 'amber' ? '#E8A33D' : '#1F2937'
+                  const sc = t.cls === 'red' ? '#C5453F' : t.cls === 'amber' ? '#E8A33D' : '#4B5563'
+                  const bdr = t.cls === 'neutral' ? '1px solid #E4DDD3' : t.cls === 'red' ? '1px solid #F5C6C4' : '1px solid #F9DEB8'
                   return (
                     <div key={t.label} style={{ background: bg, border: bdr, borderRadius: 10, padding: '12px 13px' }}>
-                      <div style={{ fontSize: 11, fontWeight: 500, color: tc }}>{t.label}</div>
-                      <div style={{ fontSize: 24, fontWeight: 500, color: tc, margin: '2px 0 1px', letterSpacing: '-0.02em', fontFamily: 'monospace' }}>{t.val}</div>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: sc, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.label}</div>
+                      <div style={{ fontSize: 24, fontWeight: 600, color: tc, margin: '2px 0 1px', letterSpacing: '-0.02em', fontFamily: 'Cambria, Georgia, serif' }}>{t.val}</div>
                       <div style={{ fontSize: 10.5, color: sc }}>{t.hint}</div>
                     </div>
                   )
@@ -311,8 +311,8 @@ export default function DashboardPage() {
                     <div style={{ fontSize: 12, color: '#8B948F', paddingTop: 8 }}>No immediate reorder actions flagged.</div>
                   ) : (
                     brandSummary.filter(b => ['Stockout', 'Reorder', 'Excess'].includes(b.status)).slice(0, 7).map((b, i) => {
-                      const tagBg = b.status === 'Stockout' ? '#FBEAEA' : b.status === 'Reorder' ? '#FBEFD9' : 'rgba(15,40,30,0.05)'
-                      const tagTc = b.status === 'Stockout' ? '#A32D2D' : b.status === 'Reorder' ? '#85530B' : '#5C6862'
+                      const tagBg = b.status === 'Stockout' ? '#FAEAEA' : b.status === 'Reorder' ? '#FEF3E2' : '#E4DDD3'
+                      const tagTc = b.status === 'Stockout' ? '#C5453F' : b.status === 'Reorder' ? '#E8A33D' : '#4B5563'
                       const action = b.status === 'Stockout' ? 'reorder now' : b.status === 'Reorder' ? 'reorder soon' : 'monitor excess'
                       return (
                         <div key={b.brand} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderTop: i === 0 ? 'none' : '0.5px solid rgba(15,40,30,0.09)', fontSize: 13, color: '#16201C' }}>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                     </thead>
                     <tbody>
                       {brandSummary.map((row, i) => {
-                        const statusStyle = row.status === 'Stockout' ? { background: '#FBEAEA', color: '#A32D2D' } : row.status === 'Reorder' ? { background: '#FBEFD9', color: '#85530B' } : row.status === 'Excess' ? { background: '#FBEFD9', color: '#85530B' } : row.status === 'Healthy' ? { background: '#E4F4EE', color: '#0F6E56' } : { background: 'rgba(15,40,30,0.05)', color: '#5C6862' }
+                        const statusStyle = row.status === 'Stockout' ? { background: '#FAEAEA', color: '#C5453F' } : row.status === 'Reorder' ? { background: '#FEF3E2', color: '#E8A33D' } : row.status === 'Excess' ? { background: '#FEF3E2', color: '#E8A33D' } : row.status === 'Healthy' ? { background: '#DCEAE8', color: '#0E5C56' } : { background: '#E4DDD3', color: '#4B5563' }
                         return (
                           <tr key={row.brand} style={{ background: i % 2 === 0 ? '#fff' : 'rgba(15,40,30,0.013)' }}>
                             <td style={{ padding: '9px 14px', fontWeight: 500, color: '#16201C', whiteSpace: 'nowrap' }}>{row.brand}</td>
@@ -354,7 +354,7 @@ export default function DashboardPage() {
                               <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 9px', borderRadius: 7, ...statusStyle }}>{row.status}</span>
                             </td>
                             <td style={{ padding: '9px 14px' }}>
-                              <button onClick={() => router.push(`/project/${encodeURIComponent(row.brand)}`)} style={{ fontSize: 11.5, color: '#048A81', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>View S&D →</button>
+                              <button onClick={() => router.push(`/project/${encodeURIComponent(row.brand)}`)} style={{ fontSize: 11.5, color: '#0E5C56', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>View S&D →</button>
                             </td>
                           </tr>
                         )
@@ -378,7 +378,7 @@ export default function DashboardPage() {
                     brandSummary.filter(b => b.fcstAcc != null).sort((a, b) => (b.fcstAcc ?? 0) - (a.fcstAcc ?? 0)).map(b => <AccBar key={b.brand} name={b.brand} pct={b.fcstAcc} />)
                   )}
                   <div style={{ display: 'flex', gap: 12, fontSize: 10.5, color: '#8B948F', marginTop: 10, flexWrap: 'wrap' }}>
-                    {[['#1D9E75', '≥85% trusted'], ['#EF9F27', '70–85% buffer'], ['#E24B4A', '<70% override']].map(([c, l]) => (
+                    {[['#2F9E68', '≥85% trusted'], ['#E8A33D', '70–85% buffer'], ['#C5453F', '<70% override']].map(([c, l]) => (
                       <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                         <i style={{ width: 9, height: 2, background: c, display: 'inline-block', borderRadius: 2 }}/>{l}
                       </span>

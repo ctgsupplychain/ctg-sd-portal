@@ -76,13 +76,13 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
       {/* SKU selector row */}
       <div className="flex items-center gap-3 flex-wrap">
         <div ref={dropdownRef} className="relative w-[750px]">
-          <button type="button" onClick={() => { setOpen(o => !o); setSearch('') }} className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#048A81] flex items-center justify-between gap-2"><span className="truncate text-sm">{selectedLabel}</span><svg className="w4 h-4 text-[#667085] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></button>
+          <button type="button" onClick={() => { setOpen(o => !o); setSearch('') }} className="w-full text-left text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-lg bg-white text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#0E5C56] flex items-center justify-between gap-2"><span className="truncate text-sm">{selectedLabel}</span><svg className="w4 h-4 text-[#667085] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></button>
           {open && (
             <div className="absolute z-50 mt-1 w-full bg-white border border-[#D0D5DD] rounded-lg shadow-lg">
-              <div className="p-2 border-b border-[#EAECF0]"><input autoFocus type="text" placeholder="Search SKU or description..." value={search} onChange={e => setSearch(e.target.value)} className="w-full text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#048A81]" /></div>
+              <div className="p-2 border-b border-[#EAECF0]"><input autoFocus type="text" placeholder="Search SKU or description..." value={search} onChange={e => setSearch(e.target.value)} className="w-full text-sm px-3 py-1.5 border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0E5C56]" /></div>
               <ul className="max-h-60 overflow-y-auto py-1">
                 {filteredSkus.length === 0 && (<li className="px-3 py-2 text-sm text-[#667085]">No results</li>)}
-                {filteredSkus.map(s => (<li key={s.sku.sku} onClick={() => { onSkuChange(s.sku.sku); setOpen(false); setSearch('') }} className={clsx('px-3 py-2 text-sm cursor-pointer hover:bg-[#F9FAFB]', s.sku.sku === selectedSku ? 'bg-[#F0FAF9] text-[#048A81] font-medium' : 'text-[#101828]')}>{s.sku.sku} — {s.sku.description || ''}</li>))}
+                {filteredSkus.map(s => (<li key={s.sku.sku} onClick={() => { onSkuChange(s.sku.sku); setOpen(false); setSearch('') }} className={clsx('px-3 py-2 text-sm cursor-pointer hover:bg-[#F9FAFB]', s.sku.sku === selectedSku ? 'bg-[#DCEAE8] text-[#0E5C56] font-medium' : 'text-[#1F2937]')}>{s.sku.sku} — {s.sku.description || ''}</li>))}
               </ul>
             </div>
           )}
@@ -98,11 +98,11 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
           <thead>
             <tr>
               <th className="bg-[#F9FAFB] border-b border-r border-[#EAECF0] px-3 py-2 text-left text-[#667085] font-medium w-28 sticky left-0 z-10">Row</th>
-              {monthSpans.map(span => (<th key={span.label} colSpan={span.count} className="bg-[#048A81] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide">{span.label}</th>))}
+              {monthSpans.map(span => (<th key={span.label} colSpan={span.count} className="bg-[#0E5C56] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide">{span.label}</th>))}
             </tr>
             <tr>
               <th className="bg-[#F9FAFB] border-b border-r border-[#EAECF0] px-3 py-2 sticky left-0 z-10"></th>
-              {weeks.map(w => (<th key={w.label} className={clsx('text-center px-2 py-1.5 font-semibold text-xs border-b border-r border-[#EAECF0] min-w-[68px]', w.label === currentWk ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#2E4057] text-white')}><div>{w.label}</div><div className="font-normal text-[10px] opacity-70">{w.mondayDate.slice(5)}</div></th>))}
+              {weeks.map(w => (<th key={w.label} className={clsx('text-center px-2 py-1.5 font-semibold text-xs border-b border-r border-[#EAECF0] min-w-[68px]', w.label === currentWk ? 'bg-[#FEF3E2] text-[#E8A33D]' : 'bg-[#1F2937] text-white')}><div>{w.label}</div><div className="font-normal text-[10px] opacity-70">{w.mondayDate.slice(5)}</div></th>))}
             </tr>
           </thead>
           <tbody>
@@ -118,10 +118,10 @@ export default function SDTable({ skus, weeks, currentWk, selectedSku, onSkuChan
 
       <div className="flex gap-4 text-[10px] text-[#667085]">
         {[
-          { color: '#1A2535', label: 'Balance' },
-          { color: '#1849A9', label: 'Supply commit' },
-          { color: '#B42318', label: 'Negative balance' },
-          { color: '#FEC84B', label: 'Current week', opacity: '0.7' },
+          { color: '#1F2937', label: 'Balance' },
+          { color: '#0E5C56', label: 'Supply commit' },
+          { color: '#C5453F', label: 'Negative balance' },
+          { color: '#E8A33D', label: 'Current week', opacity: '0.7' },
           ...(hasBackorder ? [{ color: '#F59E0B', label: 'Backorder' }] : []),
         ].map(l => (
           <span key={l.label} className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: l.color, opacity: (l as any).opacity }}></span>{l.label}</span>
@@ -138,19 +138,19 @@ function SDRow({ label, values, weeks, currentWk, rowStyle, balanceValues }: {
   currentWk: string; rowStyle: RowStyle; balanceValues?: number[]
 }) {
   const rowBg: Record<RowStyle, string> = {
-    fcast: 'bg-[#F5F5F5]', qty: 'bg-[#F0FAF0]',
-    commit: 'bg-[#EFF6FF]', uncommit: 'bg-[#FFF7ED]',
-    balance: 'bg-[#1A2535]', backorder: 'bg-[#FFFBEB]',
+    fcast: 'bg-[#F4F2EE]', qty: 'bg-[#DCEAE8]',
+    commit: 'bg-[#EFF6FF]', uncommit: 'bg-[#FEF3E2]',
+    balance: 'bg-[#1F2937]', backorder: 'bg-[#FEF3E2]',
   }
   const labelColor: Record<RowStyle, string> = {
-    fcast: 'text-[#667085]', qty: 'text-[#667085]',
-    commit: 'text-[#667085]', uncommit: 'text-[#667085]',
-    balance: 'text-[#9DB4CC]', backorder: 'text-[#92400E] font-semibold',
+    fcast: 'text-[#4B5563]', qty: 'text-[#0E5C56]',
+    commit: 'text-[#4B5563]', uncommit: 'text-[#4B5563]',
+    balance: 'text-[#DCEAE8]', backorder: 'text-[#E8A33D] font-semibold',
   }
   const cellColor: Record<RowStyle, string> = {
-    fcast: 'text-[#344054]', qty: 'text-[#344054]',
-    commit: 'text-[#1849A9] font-medium', uncommit: 'text-[#B45309]',
-    balance: 'text-white font-semibold', backorder: 'text-[#B45309] font-medium',
+    fcast: 'text-[#1F2937]', qty: 'text-[#0E5C56]',
+    commit: 'text-[#0E5C56] font-medium', uncommit: 'text-[#E8A33D]',
+    balance: 'text-white font-semibold', backorder: 'text-[#E8A33D] font-medium',
   }
 
   return (
@@ -159,7 +159,7 @@ function SDRow({ label, values, weeks, currentWk, rowStyle, balanceValues }: {
       {weeks.map((w, i) => {
         const isCurrent = w.label === currentWk
         const isNeg = rowStyle === 'balance' && balanceValues && balanceValues[i] < 0
-        return (<td key={w.label} className={clsx('text-center px-1.5 py-1.5 border-b border-r border-[#EAECF0] text-xs tabular-nums', rowBg[rowStyle], cellColor[rowStyle], isCurrent && rowStyle !== 'balance' && 'bg-[#FFFBEB]', isCurrent && rowStyle === 'balance' && 'bg-[#2E3D50]', isNeg && '!text-[#FDA29B]')}>{values[i]}</td>)
+        return (<td key={w.label} className={clsx('text-center px-1.5 py-1.5 border-b border-r border-[#EAECF0] text-xs tabular-nums', rowBg[rowStyle], cellColor[rowStyle], isCurrent && rowStyle !== 'balance' && 'bg-[#FEF3E2]', isCurrent && rowStyle === 'balance' && 'bg-[#0E5C56]', isNeg && '!text-[#C5453F]')}>{values[i]}</td>)
       })}
     </tr>
   )

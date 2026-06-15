@@ -168,13 +168,13 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       datasets.push({
         label: 'CI upper',
         data: [...fcPad, ...forecast.map(f => f.upper)],
-        borderColor: 'transparent', backgroundColor: 'rgba(29,158,117,0.12)',
+        borderColor: 'transparent', backgroundColor: 'rgba(47,158,104,0.12)',
         fill: '+1', pointRadius: 0, tension: 0.3, order: 5,
       })
       datasets.push({
         label: 'CI lower',
         data: [...fcPad, ...forecast.map(f => f.lower)],
-        borderColor: 'transparent', backgroundColor: 'rgba(29,158,117,0.12)',
+        borderColor: 'transparent', backgroundColor: 'rgba(47,158,104,0.12)',
         fill: false, pointRadius: 0, tension: 0.3, order: 5,
       })
     }
@@ -183,7 +183,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       datasets.push({
         label: 'Forecast',
         data: [...fcPad, ...forecast.map(f => f.qty)],
-        borderColor: '#1D9E75', backgroundColor: 'transparent',
+        borderColor: '#2F9E68', backgroundColor: 'transparent',
         borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, order: 2,
       })
     }
@@ -192,7 +192,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       datasets.push({
         label: 'Actuals',
         data: [...history.map(h => h.qty), ...histPad],
-        borderColor: '#888780', backgroundColor: 'transparent',
+        borderColor: '#4B5563', backgroundColor: 'transparent',
         borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, tension: 0.2, order: 3,
       })
     }
@@ -218,7 +218,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       datasets.push({
         label: 'B2C',
         data: [...b2cData, ...histPad],
-        borderColor: '#E8474C', backgroundColor: 'transparent',
+        borderColor: '#C5453F', backgroundColor: 'transparent',
         borderWidth: 1.5, borderDash: [3, 2],
         pointRadius: 0, pointHoverRadius: 4, tension: 0.2, order: 4,
       })
@@ -228,7 +228,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       datasets.push({
         label: 'S&D plan',
         data: [...new Array(nHist).fill(null), ...skuResult.weeks.map(w => w.forecastQty)],
-        borderColor: '#378ADD', backgroundColor: 'transparent',
+        borderColor: '#0E5C56', backgroundColor: 'transparent',
         borderWidth: 1.5, borderDash: [4, 3],
         pointRadius: 0, pointHoverRadius: 4, tension: 0.2, order: 1,
       })
@@ -241,7 +241,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       datasets.push({
         label: 'Safety stock',
         data: new Array(totalPoints).fill(safetyStock),
-        borderColor: '#EF9F27', backgroundColor: 'transparent',
+        borderColor: '#E8A33D', backgroundColor: 'transparent',
         borderWidth: 1.5, borderDash: [3, 3],
         pointRadius: 0, pointHoverRadius: 0, tension: 0, order: 0,
       })
@@ -269,13 +269,13 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
         },
         scales: {
           x: {
-            ticks: { maxTicksLimit: 14, maxRotation: 45, font: { size: 10 }, color: '#888780' },
-            grid:  { color: 'rgba(136,135,128,0.08)' },
+            ticks: { maxTicksLimit: 14, maxRotation: 45, font: { size: 10 }, color: '#4B5563' },
+            grid:  { color: 'rgba(75,85,99,0.08)' },
           },
           y: {
             min: 0,
             ticks: {
-              font: { size: 11 }, color: '#888780',
+              font: { size: 11 }, color: '#4B5563',
               callback: (v: number) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : String(Math.round(v)),
             },
             grid: { color: 'rgba(136,135,128,0.08)' },
@@ -294,21 +294,21 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
   const fc26total  = forecast.reduce((a, f) => a + f.qty, 0)
 
   return (
-    <div className="bg-white rounded-xl border border-[#EAECF0] p-5 mt-4">
+    <div className="bg-white rounded-xl border border-[#E4DDD3] p-5 mt-4">
 
       <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-sm font-semibold text-[#344054]">Demand Forecast</h2>
+          <h2 className="text-sm font-semibold text-[#1F2937]">Demand Forecast</h2>
           {modelLabel && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[#E1F5EE] text-[#085041] font-medium">{modelLabel}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[#DCEAE8] text-[#0E5C56] font-medium">{modelLabel}</span>
           )}
           {history.length > 0 && (
-            <span className="text-xs text-[#98A2B3]">{history.length}wk history</span>
+            <span className="text-xs text-[#4B5563]">{history.length}wk history</span>
           )}
         </div>
-        <div className="flex items-center gap-4 text-xs text-[#667085]">
+        <div className="flex items-center gap-4 text-xs text-[#4B5563]">
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input type="checkbox" checked={showHist} onChange={e => setShowHist(e.target.checked)} className="accent-[#888780]" />
+            <input type="checkbox" checked={showHist} onChange={e => setShowHist(e.target.checked)} className="accent-[#4B5563]" />
             History
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -316,11 +316,11 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
             B2B
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input type="checkbox" checked={showB2C} onChange={e => setShowB2C(e.target.checked)} className="accent-[#E8474C]" />
+            <input type="checkbox" checked={showB2C} onChange={e => setShowB2C(e.target.checked)} className="accent-[#C5453F]" />
             B2C
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input type="checkbox" checked={showCI} onChange={e => setShowCI(e.target.checked)} className="accent-[#1D9E75]" />
+            <input type="checkbox" checked={showCI} onChange={e => setShowCI(e.target.checked)} className="accent-[#2F9E68]" />
             80% CI band
           </label>
         </div>
@@ -328,12 +328,12 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
 
       <div className="flex gap-5 mb-3 flex-wrap">
         {[
-          { color: '#888780', label: 'Actuals',  dash: false },
-          { color: '#1D9E75', label: modelLabel ?? 'Forecast', dash: false },
-          { color: '#378ADD', label: 'S&D plan', dash: true },
-          { color: '#EF9F27', label: 'Safety stock', dash: true },
+          { color: '#4B5563', label: 'Actuals',  dash: false },
+          { color: '#2F9E68', label: modelLabel ?? 'Forecast', dash: false },
+          { color: '#0E5C56', label: 'S&D plan', dash: true },
+          { color: '#E8A33D', label: 'Safety stock', dash: true },
         ].map(l => (
-          <span key={l.label} className="flex items-center gap-1.5 text-xs text-[#667085]">
+          <span key={l.label} className="flex items-center gap-1.5 text-xs text-[#4B5563]">
             <svg width="20" height="10" aria-hidden="true">
               <line x1="0" y1="5" x2="20" y2="5" stroke={l.color} strokeWidth="2"
                 strokeDasharray={l.dash ? '4 3' : undefined} />
@@ -342,7 +342,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
           </span>
         ))}
         {showB2B && (
-          <span className="flex items-center gap-1.5 text-xs text-[#667085]">
+          <span className="flex items-center gap-1.5 text-xs text-[#4B5563]">
             <svg width="20" height="10" aria-hidden="true">
               <line x1="0" y1="5" x2="20" y2="5" stroke="#7C3AED" strokeWidth="2" strokeDasharray="3 2" />
             </svg>
@@ -350,16 +350,16 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
           </span>
         )}
         {showB2C && (
-          <span className="flex items-center gap-1.5 text-xs text-[#667085]">
+          <span className="flex items-center gap-1.5 text-xs text-[#4B5563]">
             <svg width="20" height="10" aria-hidden="true">
-              <line x1="0" y1="5" x2="20" y2="5" stroke="#E8474C" strokeWidth="2" strokeDasharray="3 2" />
+              <line x1="0" y1="5" x2="20" y2="5" stroke="#C5453F" strokeWidth="2" strokeDasharray="3 2" />
             </svg>
             B2C
           </span>
         )}
         {showCI && (
-          <span className="flex items-center gap-1.5 text-xs text-[#667085]">
-            <span className="w-5 h-3 inline-block rounded-sm" style={{ background: 'rgba(29,158,117,0.2)' }} />
+          <span className="flex items-center gap-1.5 text-xs text-[#4B5563]">
+            <span className="w-5 h-3 inline-block rounded-sm" style={{ background: 'rgba(47,158,104,0.2)' }} />
             80% CI
           </span>
         )}
@@ -367,11 +367,11 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
 
       <div style={{ position: 'relative', height: '240px', overflowX: 'auto', overflowY: 'hidden' }}>
         {loading ? (
-          <div className="flex items-center justify-center h-full text-sm text-[#98A2B3]">Loading forecast data...</div>
+          <div className="flex items-center justify-center h-full text-sm text-[#4B5563]">Loading forecast data...</div>
         ) : !ready ? (
-          <div className="flex items-center justify-center h-full text-sm text-[#98A2B3]">Initialising chart...</div>
+          <div className="flex items-center justify-center h-full text-sm text-[#4B5563]">Initialising chart...</div>
         ) : forecast.length === 0 && history.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-sm text-[#98A2B3]">
+          <div className="flex items-center justify-center h-full text-sm text-[#4B5563]">
             No forecast data. Upload sales history to generate.
           </div>
         ) : (
@@ -382,7 +382,7 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
       </div>
 
       {forecast.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-[#EAECF0] grid grid-cols-4 gap-3">
+        <div className="mt-3 pt-3 border-t border-[#E4DDD3] grid grid-cols-4 gap-3">
           {[
             { label: '52-wk total',    value: fc26total.toLocaleString() },
             { label: 'Avg / wk',       value: Math.round(fc26total / forecast.length).toLocaleString() },
@@ -390,8 +390,8 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
             { label: 'Wk 52 forecast', value: (forecast[51]?.qty ?? 0).toLocaleString() },
           ].map(s => (
             <div key={s.label}>
-              <p className="text-[10px] text-[#98A2B3] uppercase tracking-wide mb-0.5">{s.label}</p>
-              <p className="text-sm font-semibold text-[#344054]">{s.value}</p>
+              <p className="text-[10px] text-[#4B5563] uppercase tracking-wide mb-0.5">{s.label}</p>
+              <p className="text-sm font-semibold text-[#1F2937]">{s.value}</p>
             </div>
           ))}
         </div>
@@ -399,3 +399,4 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
     </div>
   )
 }
+   

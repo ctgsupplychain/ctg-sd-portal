@@ -242,8 +242,8 @@ export function computeSD(params: {
 
 // Flag display helpers
 export const FLAG_DISPLAY: Record<SkuSdResult['flag'], { emoji: string; label: string; color: string }> = {
-  STOCKOUT:   { emoji: '🔴', label: 'STOCKOUT',   color: '#B42318' },
-  RELEASE_PO: { emoji: '🟠', label: 'RELEASE PO', color: '#B54708' },
-  PLAN_PO:    { emoji: '🟡', label: 'PLAN PO',    color: '#854D0E' },
-  OK:         { emoji: '🟢', label: 'OK',         color: '#166534' },
+  STOCKOUT:   { emoji: '🔴', label: 'STOCKOUT',   color: '#C5453F' },  // Signal red
+  RELEASE_PO: { emoji: '🟠', label: 'RELEASE PO', color: '#E8A33D' },  // Signal amber
+  PLAN_PO:    { emoji: '🟡', label: 'PLAN PO',    color: '#E8A33D' },  // Signal amber
+  OK:         { emoji: '🟢', label: 'OK',         color: '#2F9E68' },  // Signal green
 }
