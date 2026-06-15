@@ -12,17 +12,17 @@ interface Props {
 }
 
 const BRAND_COLORS: Record<string, string> = {
-  Naturelish: '#048A81',
+  Naturelish: '#0E5C56',
   Bonlife:    '#6366f1',
   Mejorecare: '#8b5cf6',
   KATA:       '#f59e0b',
   iProcare:   '#10b981',
-  SwissMed:   '#3b82f6',
+  SwissMed:   '#4B5563',
   GoHerb:     '#f97316',
 }
 
 function brandColor(brand: string | null): string {
-  return BRAND_COLORS[brand ?? ''] ?? '#667085'
+  return BRAND_COLORS[brand ?? ''] ?? '#4B5563'
 }
 
 export default function Sidebar({ parts, selected, onSelect, loading }: Props) {
@@ -36,7 +36,7 @@ export default function Sidebar({ parts, selected, onSelect, loading }: Props) {
   }, {})
 
   return (
-    <div className="w-52 min-w-52 bg-[#1A2535] flex flex-col h-full">
+    <div className="w-52 min-w-52 flex flex-col h-full" style={{ background: "#1F2937" }}>
       {/* Header */}
       <div className="px-4 py-5 border-b border-white/10">
         <div className="text-white font-semibold text-sm tracking-wide">CTG PLM</div>
@@ -82,13 +82,13 @@ export default function Sidebar({ parts, selected, onSelect, loading }: Props) {
                   className={clsx(
                     'w-full text-left px-4 py-2 border-l-2 transition-all',
                     isSelected
-                      ? 'bg-white/8 border-[#048A81]'
+                      ? 'bg-white/8 border-[#0E5C56]'
                       : 'border-transparent hover:bg-white/5 hover:border-white/20'
                   )}
                 >
                   <div className={clsx(
                     'text-xs font-mono mb-0.5',
-                    isSelected ? 'text-[#048A81]' : 'text-white/40'
+                    isSelected ? 'text-[#0E5C56]' : 'text-white/40'
                   )}>
                     {p.part_number}
                   </div>

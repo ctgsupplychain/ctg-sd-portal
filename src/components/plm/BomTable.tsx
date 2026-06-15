@@ -3,17 +3,17 @@ import { BomRow, PartCategory } from '@/lib/plm-types'
 import { CostResult } from '@/lib/plm-types'
 
 const CAT_STYLE: Record<PartCategory, { bg: string; color: string }> = {
-  SA:  { bg: '#EEF2FF', color: '#4338ca' },
-  PK:  { bg: '#F3F0FF', color: '#7c3aed' },
-  RM:  { bg: '#ECFDF5', color: '#047857' },
-  FG:  { bg: '#FFFBEB', color: '#b45309' },
+  SA:  { bg: '#E4DDD3', color: '#1F2937' },
+  PK:  { bg: '#E4DDD3', color: '#4B5563' },
+  RM:  { bg: '#DCEAE8', color: '#0E5C56' },
+  FG:  { bg: '#FEF3E2', color: '#E8A33D' },
   WIP: { bg: '#FEF2F2', color: '#dc2626' },
 }
 const LV_STYLE = [
   { bg: '#E0F2FE', color: '#0369a1' },
-  { bg: '#F3F0FF', color: '#7c3aed' },
-  { bg: '#ECFDF5', color: '#047857' },
-  { bg: '#FFFBEB', color: '#b45309' },
+  { bg: '#E4DDD3', color: '#4B5563' },
+  { bg: '#DCEAE8', color: '#0E5C56' },
+  { bg: '#FEF3E2', color: '#E8A33D' },
 ]
 const FLAGS: Record<string, string> = { MY: '🇲🇾', CN: '🇨🇳', US: '🇺🇸' }
 
@@ -27,7 +27,7 @@ interface Props {
 }
 
 const TH = ({ children, right }: { children: React.ReactNode; right?: boolean }) => (
-  <th className="px-4 py-2.5 text-left text-xs font-medium text-[#667085] uppercase tracking-wider bg-[#F9FAFB] border-b border-[#EAECF0] whitespace-nowrap sticky top-0 z-10"
+  <th className="px-4 py-2.5 text-left text-xs font-medium text-[#4B5563] uppercase tracking-wider bg-[#F4F2EE] border-b border-[#E4DDD3] whitespace-nowrap sticky top-0 z-10"
     style={{ textAlign: right ? 'right' : 'left' }}>
     {children}
   </th>
@@ -95,20 +95,20 @@ export default function BomTable({ rows, costMap, showL2, openPn, onToggle }: Pr
             const el = cost?.ext_landed ?? 0
             const pct = maxLanded > 0 ? (el / maxLanded * 100) : 0
             const share = totLanded > 0 && el ? ((el / totLanded) * 100).toFixed(1) + '%' : '—'
-            const barColor = row.category === 'RM' ? '#048A81' : row.category === 'PK' ? '#7c3aed' : '#3b82f6'
+            const barColor = row.category === 'RM' ? '#0E5C56' : row.category === 'PK' ? '#4B5563' : '#1F2937'
             const hasTiers = (row.price_tiers?.length ?? 0) > 1
 
             return (
               <tr
                 key={row.component_pn + i}
                 onClick={() => onToggle(row.component_pn)}
-                className="cursor-pointer border-b border-[#EAECF0] transition-colors hover:bg-[#F9FAFB]"
+                className="cursor-pointer border-b border-[#E4DDD3] transition-colors hover:bg-[#F4F2EE]"
                 style={{
-                  background: isOpen ? '#F0FDF9' : i % 2 === 1 ? '#FAFAFA' : 'white',
-                  borderLeft: isOpen ? '3px solid #048A81' : '3px solid transparent',
+                  background: isOpen ? '#DCEAE8' : i % 2 === 1 ? '#FAFAFA' : 'white',
+                  borderLeft: isOpen ? '3px solid #0E5C56' : '3px solid transparent',
                 }}
               >
-                <td className="px-4 py-2.5 text-xs text-[#667085] font-mono">{String(i + 1).padStart(2, '0')}</td>
+                <td className="px-4 py-2.5 text-xs text-[#4B5563] font-mono">{String(i + 1).padStart(2, '0')}</td>
 
                 <td className="px-4 py-2.5">
                   <span className="inline-block px-1.5 py-0.5 rounded text-xs font-semibold font-mono"
@@ -123,7 +123,7 @@ export default function BomTable({ rows, costMap, showL2, openPn, onToggle }: Pr
                     <a
                       href={`/plm/${encodeURIComponent(row.component_pn)}`}
                       onClick={e => e.stopPropagation()}
-                      className="text-xs font-mono text-[#048A81] border-b border-dashed border-[#048A81]/30 hover:border-solid hover:text-[#036b64]"
+                      className="text-xs font-mono text-[#0E5C56] border-b border-dashed border-[#0E5C56]/30 hover:border-solid hover:text-[#036b64]"
                       title="Open part detail"
                     >
                       {row.component_pn}
@@ -131,7 +131,7 @@ export default function BomTable({ rows, costMap, showL2, openPn, onToggle }: Pr
                   </div>
                 </td>
 
-                <td className="px-4 py-2.5 text-sm text-[#344054]">{row.component_desc}</td>
+                <td className="px-4 py-2.5 text-sm text-[#1F2937]">{row.component_desc}</td>
 
                 <td className="px-4 py-2.5">
                   <span className="px-1.5 py-0.5 rounded text-xs font-medium"
@@ -140,33 +140,33 @@ export default function BomTable({ rows, costMap, showL2, openPn, onToggle }: Pr
                   </span>
                 </td>
 
-                <td className="px-4 py-2.5 text-right text-sm font-mono text-[#344054]">{row.qty_per_fg}</td>
-                <td className="px-4 py-2.5 text-xs text-[#667085] font-mono">{row.uom}</td>
+                <td className="px-4 py-2.5 text-right text-sm font-mono text-[#1F2937]">{row.qty_per_fg}</td>
+                <td className="px-4 py-2.5 text-xs text-[#4B5563] font-mono">{row.uom}</td>
 
                 <td className="px-4 py-2.5">
                   {row.supplier_name
-                    ? <span className="text-xs text-[#667085] flex items-center gap-1">
+                    ? <span className="text-xs text-[#4B5563] flex items-center gap-1">
                         {FLAGS[row.supplier_country ?? ''] ?? ''} {row.supplier_name}
                       </span>
-                    : <span className="text-xs text-[#D0D5DD]">—</span>
+                    : <span className="text-xs text-[#E4DDD3]">—</span>
                   }
                 </td>
 
-                <td className="px-4 py-2.5 text-xs text-[#667085] font-mono">{row.current_revision ?? '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-[#4B5563] font-mono">{row.current_revision ?? '—'}</td>
 
                 <td className="px-4 py-2.5 text-right">
                   {up === null || up === undefined
-                    ? <span className="text-xs text-[#D0D5DD] italic">—</span>
+                    ? <span className="text-xs text-[#E4DDD3] italic">—</span>
                     : <div>
-                        <span className="text-sm font-mono text-[#344054]">RM {up.toFixed(4)}</span>
+                        <span className="text-sm font-mono text-[#1F2937]">RM {up.toFixed(4)}</span>
                         {hasTiers && cost && (
                           <span className="ml-1.5 text-xs px-1 py-0.5 rounded font-mono"
-                            style={{ background: '#FFFBEB', color: '#b45309' }}>
+                            style={{ background: '#FEF3E2', color: '#E8A33D' }}>
                             T{cost.active_tier_idx + 1}
                           </span>
                         )}
                         {hasTiers && cost && (
-                          <div className="text-xs text-[#667085] font-mono mt-0.5">
+                          <div className="text-xs text-[#4B5563] font-mono mt-0.5">
                             {cost.child_order_qty.toLocaleString()} {row.uom}
                           </div>
                         )}
@@ -176,15 +176,15 @@ export default function BomTable({ rows, costMap, showL2, openPn, onToggle }: Pr
 
                 <td className="px-4 py-2.5 text-right">
                   {cost?.ext_landed === null || cost?.ext_landed === undefined
-                    ? <span className="text-xs text-[#D0D5DD] italic">rolled up</span>
-                    : <span className="text-sm font-mono text-[#344054]">RM {el.toFixed(4)}</span>
+                    ? <span className="text-xs text-[#E4DDD3] italic">rolled up</span>
+                    : <span className="text-sm font-mono text-[#1F2937]">RM {el.toFixed(4)}</span>
                   }
                 </td>
 
                 <td className="px-4 py-2.5 text-right">
                   <div className="flex items-center gap-2 justify-end">
-                    <span className="text-xs text-[#667085] min-w-[32px] text-right">{share}</span>
-                    <div className="w-12 h-1.5 bg-[#F2F4F7] rounded-full overflow-hidden">
+                    <span className="text-xs text-[#4B5563] min-w-[32px] text-right">{share}</span>
+                    <div className="w-12 h-1.5 bg-[#E4DDD3] rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-500"
                         style={{ width: `${pct}%`, background: barColor }} />
                     </div>

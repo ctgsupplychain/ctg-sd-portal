@@ -22,25 +22,25 @@ export default function MetricStrip({ totMat, totFreight, totTax, totLanded, fre
   ]
 
   return (
-    <div className="grid border-b border-[#EAECF0] bg-white" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+    <div className="grid border-b border-[#E4DDD3] bg-white" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
       {metrics.map((m, i) => (
         <div
           key={i}
           className="px-5 py-4"
-          style={{ borderRight: i < metrics.length - 1 ? '1px solid #EAECF0' : 'none' }}
+          style={{ borderRight: i < metrics.length - 1 ? '1px solid #E4DDD3' : 'none' }}
         >
-          <div className="text-[10px] font-medium text-[#667085] uppercase tracking-wider mb-1.5">
+          <div className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wider mb-1.5">
             {m.label}
           </div>
           <div
             className="text-xl font-semibold font-mono"
             style={{
-              color: m.accent ? '#048A81' : m.warn ? '#d97706' : m.bold ? '#101828' : '#344054'
+              color: m.accent ? '#0E5C56' : m.warn ? '#d97706' : m.bold ? '#1F2937' : '#1F2937'
             }}
           >
             {m.value}
           </div>
-          <div className="text-xs text-[#667085] mt-0.5">{m.sub}</div>
+          <div className="text-xs text-[#4B5563] mt-0.5">{m.sub}</div>
         </div>
       ))}
     </div>

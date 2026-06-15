@@ -182,4 +182,10 @@ function NavItem({ icon, label, href, active, onClick }: {
     <button
       onClick={onClick}
       style={active ? { borderLeft: '2px solid #0E5C56', background: 'rgba(14,92,86,0.15)', color: '#FFFFFF' } : { borderLeft: '2px solid transparent', color: 'rgba(255,255,255,0.5)' }}
-   
+         className="w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-all border-l-2"
+    >
+      <span>{icon}</span>
+      <span className="truncate">{label}</span>
+    </button>
+  )
+}

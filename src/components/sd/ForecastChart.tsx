@@ -399,4 +399,3 @@ export default function ForecastChart({ selectedSku, skuResult }: ForecastChartP
     </div>
   )
 }
-   

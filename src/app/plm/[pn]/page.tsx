@@ -48,33 +48,33 @@ export default function PartDetailPage() {
   useEffect(() => { load() }, [load])
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen bg-[#F0F2F5] text-sm text-[#667085]">Loading {pn}…</div>
+    return <div className="flex items-center justify-center h-screen bg-[#F4F2EE] text-sm text-[#4B5563]">Loading {pn}…</div>
   }
   if (!part) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-[#F0F2F5] gap-3">
-        <div className="text-sm text-[#667085]">Part {pn} not found.</div>
-        <button onClick={() => router.push('/plm')} className="text-xs text-[#048A81] underline">← Back to BOM Viewer</button>
+      <div className="flex flex-col items-center justify-center h-screen bg-[#F4F2EE] gap-3">
+        <div className="text-sm text-[#4B5563]">Part {pn} not found.</div>
+        <button onClick={() => router.push('/plm')} className="text-xs text-[#0E5C56] underline">← Back to BOM Viewer</button>
       </div>
     )
   }
 
   const lcColor = part.lifecycle_status === 'Active' ? '#12B76A'
-    : part.lifecycle_status === 'NPI' ? '#048A81'
-    : part.lifecycle_status === 'EOL' ? '#F79009' : '#667085'
+    : part.lifecycle_status === 'NPI' ? '#0E5C56'
+    : part.lifecycle_status === 'EOL' ? '#F79009' : '#4B5563'
 
   return (
-    <div className="flex flex-col h-screen bg-[#F0F2F5] overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#F4F2EE] overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-[#EAECF0] px-6 pt-3 pb-0 flex-shrink-0">
+      <div className="bg-white border-b border-[#E4DDD3] px-6 pt-3 pb-0 flex-shrink-0">
         <button onClick={() => router.push('/plm')}
-          className="flex items-center gap-1.5 text-xs text-[#667085] hover:text-[#048A81] transition-colors mb-2.5">
+          className="flex items-center gap-1.5 text-xs text-[#4B5563] hover:text-[#0E5C56] transition-colors mb-2.5">
           <ArrowLeft size={13} /> Back to BOM Viewer
         </button>
         <div className="flex items-center gap-3 flex-wrap mb-3">
-          <span className="font-mono text-sm bg-[#F0FDF9] text-[#048A81] px-2.5 py-1 rounded-md border border-[#048A81]/20">{part.part_number}</span>
-          <span className="text-base font-semibold text-[#101828]">{part.description}</span>
-          <span className="ml-auto flex items-center gap-2 text-xs text-[#667085]">
+          <span className="font-mono text-sm bg-[#DCEAE8] text-[#0E5C56] px-2.5 py-1 rounded-md border border-[#0E5C56]/20">{part.part_number}</span>
+          <span className="text-base font-semibold text-[#1F2937]">{part.description}</span>
+          <span className="ml-auto flex items-center gap-2 text-xs text-[#4B5563]">
             <span className="w-2 h-2 rounded-full" style={{ background: lcColor }} />
             {part.lifecycle_status} · {part.current_revision}
           </span>
@@ -90,8 +90,8 @@ export default function PartDetailPage() {
                 disabled={disabled}
                 className="px-3.5 py-2.5 text-xs whitespace-nowrap border-b-2 transition-colors"
                 style={{
-                  color: disabled ? '#D0D5DD' : active ? '#048A81' : '#667085',
-                  borderBottomColor: active ? '#048A81' : 'transparent',
+                  color: disabled ? '#E4DDD3' : active ? '#0E5C56' : '#4B5563',
+                  borderBottomColor: active ? '#0E5C56' : 'transparent',
                   fontWeight: active ? 600 : 400,
                   cursor: disabled ? 'not-allowed' : 'pointer',
                 }}>

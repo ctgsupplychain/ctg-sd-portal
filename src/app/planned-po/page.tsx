@@ -39,21 +39,6 @@ interface PlannedPoRow {
   note: string
 }
 
-interface ComponentPoRow {
-  id: number
-  po_number: string
-  part_number: string
-  brand: string | null
-  company: string | null
-  supplier_name: string | null
-  qty: number
-  balance_qty: number | null
-  delivery_date: string | null
-  receipt_wk: string | null
-  commit_status: string | null
-  status: string
-}
-
 // ── component ─────────────────────────────────────────────────────────────────
 
 export default function PlannedPoPage() {
@@ -62,10 +47,8 @@ export default function PlannedPoPage() {
   const [profile, setProfile] = useState<any>(null)
   const [brands, setBrands] = useState<string[]>([])
   const [rows, setRows] = useState<PlannedPoRow[]>([])
-  const [componentPos, setComponentPos] = useState<ComponentPoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filterFlag, setFilterFlag] = useState<'ALL' | 'RELEASE_PO' | 'PLAN_PO'>('ALL')
-  const [filterCompany, setFilterCompany] = useState<string>('All')
   const [snapshotDate, setSnapshotDate] = useState('')
 
   useEffect(() => { loadAll() }, [])
@@ -78,7 +61,7 @@ export default function PlannedPoPage() {
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(prof)
 
-    // ── 1. Determine accessible brands ───────────────────────────────────────
+    // ── 1. Determine accessible brands ────────────────────────────────────────
     const isAdmin = prof?.role === 'admin' || prof?.role === 'supply_chain'
     let accessibleBrands: string[] = []
     if (isAdmin) {
@@ -241,16 +224,6 @@ export default function PlannedPoPage() {
     })
 
     setRows(plannedRows)
-
-    // ── 8. Load open component POs ────────────────────────────────────────────
-    const { data: compPoData } = await supabase
-      .from('purchase_orders')
-      .select('id, po_number, part_number, brand, company, supplier_name, qty, balance_qty, delivery_date, receipt_wk, commit_status, status')
-      .not('part_number', 'is', null)
-      .eq('status', 'Open')
-      .order('receipt_wk', { ascending: true })
-
-    setComponentPos((compPoData ?? []) as ComponentPoRow[])
     setLoading(false)
   }
 
@@ -285,39 +258,33 @@ export default function PlannedPoPage() {
   const releaseCount = rows.filter(r => r.flag === 'RELEASE_PO').length
   const planCount = rows.filter(r => r.flag === 'PLAN_PO').length
 
-  // Component PO filter
-  const companies = ['All', ...Array.from(new Set(componentPos.map(r => r.company ?? r.brand ?? '—').filter(Boolean))).sort()]
-  const visibleCompPos = filterCompany === 'All'
-    ? componentPos
-    : componentPos.filter(r => (r.company ?? r.brand) === filterCompany)
-
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F0F2F5]">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F4F2EE' }}>
       <Sidebar userEmail={profile?.email} userName={profile?.full_name}
         userRole={profile?.role} brands={brands} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top bar */}
-        <div className="bg-white border-b border-[#EAECF0] px-6 py-3 flex items-center justify-between">
+        <div className="bg-white px-6 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E4DDD3' }}>
           <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold text-[#101828]">Planned PO</h1>
-            <span className="bg-[#F2F4F7] text-[#667085] text-xs px-2.5 py-1 rounded-full">{CURRENT_WK} 2026</span>
+            <h1 className="text-sm font-semibold" style={{ color: '#1F2937', fontFamily: 'Cambria, Georgia, serif' }}>Planned PO</h1>
+            <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: '#E4DDD3', color: '#4B5563' }}>{CURRENT_WK} 2026</span>
             {snapshotDate && (
-              <span className="text-xs text-[#98A2B3]">Inventory: {snapshotDate}</span>
+              <span className="text-xs" style={{ color: '#4B5563' }}>Inventory: {snapshotDate}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={exportCsv}
               disabled={loading || rows.length === 0}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB] disabled:opacity-40"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#E4DDD3] rounded-lg hover:bg-[#F4F2EE] disabled:opacity-40" style={{ color: '#4B5563' }}
             >
               <Download size={12} /> Export CSV
             </button>
             <button
               onClick={loadAll}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB]"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#E4DDD3] rounded-lg hover:bg-[#F4F2EE]" style={{ color: '#4B5563' }}
             >
               <RefreshCw size={12} /> Refresh
             </button>
@@ -326,27 +293,27 @@ export default function PlannedPoPage() {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-[#667085] text-sm">
+            <div className="flex items-center justify-center h-40 text-sm" style={{ color: '#4B5563' }}>
               Computing replenishment queue across all SKUs...
             </div>
           ) : (
             <>
               {/* KPI strip */}
               <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                  <div className="text-xs text-[#667085] mb-1">Release PO</div>
-                  <div className="text-2xl font-semibold text-[#B54708]">{releaseCount}</div>
-                  <div className="text-xs mt-1 text-[#667085]">POs overdue or due within LT window</div>
+                <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+                  <div className="text-xs mb-1" style={{ color: '#4B5563' }}>Release PO</div>
+                  <div className="text-2xl font-semibold" style={{ color: '#C5453F', fontFamily: 'Cambria, Georgia, serif' }}>{releaseCount}</div>
+                  <div className="text-xs mt-1" style={{ color: '#4B5563' }}>POs overdue or due within LT window</div>
                 </div>
-                <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                  <div className="text-xs text-[#667085] mb-1">Plan PO</div>
-                  <div className="text-2xl font-semibold text-[#854D0E]">{planCount}</div>
-                  <div className="text-xs mt-1 text-[#667085]">Stockout projected beyond LT — plan ahead</div>
+                <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+                  <div className="text-xs mb-1" style={{ color: '#4B5563' }}>Plan PO</div>
+                  <div className="text-2xl font-semibold" style={{ color: '#E8A33D', fontFamily: 'Cambria, Georgia, serif' }}>{planCount}</div>
+                  <div className="text-xs mt-1" style={{ color: '#4B5563' }}>Stockout projected beyond LT — plan ahead</div>
                 </div>
-                <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                  <div className="text-xs text-[#667085] mb-1">Total SKUs Flagged</div>
-                  <div className="text-2xl font-semibold text-[#101828]">{rows.length}</div>
-                  <div className="text-xs mt-1 text-[#667085]">Across all accessible brands</div>
+                <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+                  <div className="text-xs mb-1" style={{ color: '#4B5563' }}>Total SKUs Flagged</div>
+                  <div className="text-2xl font-semibold" style={{ color: '#1F2937', fontFamily: 'Cambria, Georgia, serif' }}>{rows.length}</div>
+                  <div className="text-xs mt-1" style={{ color: '#4B5563' }}>Across all accessible brands</div>
                 </div>
               </div>
 
@@ -358,8 +325,8 @@ export default function PlannedPoPage() {
                     onClick={() => setFilterFlag(f)}
                     className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
                       filterFlag === f
-                        ? 'bg-[#101828] text-white border-[#101828]'
-                        : 'bg-white text-[#667085] border-[#D0D5DD] hover:bg-[#F9FAFB]'
+                        ? 'bg-[#1F2937] text-white border-[#1F2937]'
+                        : 'bg-white border-[#E4DDD3] hover:bg-[#F4F2EE]'
                     }`}
                   >
                     {f === 'ALL' ? `All (${rows.length})`
@@ -371,70 +338,100 @@ export default function PlannedPoPage() {
 
               {/* Table */}
               {visibleRows.length === 0 ? (
-                <div className="bg-white rounded-xl border border-[#EAECF0] p-10 text-center text-sm text-[#667085]">
+                <div className="bg-white rounded-xl p-10 text-center text-sm" style={{ border: '1px solid #E4DDD3', color: '#4B5563' }}>
                   No replenishment actions required.
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-[#EAECF0] overflow-hidden">
+                <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E4DDD3' }}>
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-[#F9FAFB] border-b border-[#EAECF0]">
-                        <th className="text-left px-4 py-3 text-[#667085] font-medium w-28">Priority</th>
-                        <th className="text-left px-4 py-3 text-[#667085] font-medium">Brand</th>
-                        <th className="text-left px-4 py-3 text-[#667085] font-medium">SKU</th>
-                        <th className="text-left px-4 py-3 text-[#667085] font-medium max-w-[200px]">Description</th>
-                        <th className="text-center px-4 py-3 text-[#667085] font-medium">LT (wks)</th>
-                        <th className="text-center px-4 py-3 text-[#667085] font-medium">WoC (wks)</th>
-                        <th className="text-center px-4 py-3 text-[#667085] font-medium">Stockout Wk</th>
-                        <th className="text-center px-4 py-3 text-[#667085] font-medium">Release By</th>
-                        <th className="text-right px-4 py-3 text-[#667085] font-medium">Order Qty</th>
-                        <th className="text-left px-4 py-3 text-[#667085] font-medium w-8"></th>
+                      <tr style={{ background: '#F4F2EE', borderBottom: '1px solid #E4DDD3' }}>
+                        <th className="text-left px-4 py-3 font-medium w-28" style={{ color: '#4B5563' }}>Priority</th>
+                        <th className="text-left px-4 py-3 font-medium" style={{ color: '#4B5563' }}>Brand</th>
+                        <th className="text-left px-4 py-3 font-medium" style={{ color: '#4B5563' }}>SKU</th>
+                        <th className="text-left px-4 py-3 font-medium max-w-[200px]" style={{ color: '#4B5563' }}>Description</th>
+                        <th className="text-center px-4 py-3 font-medium" style={{ color: '#4B5563' }}>LT (wks)</th>
+                        <th className="text-center px-4 py-3 font-medium" style={{ color: '#4B5563' }}>WoC (wks)</th>
+                        <th className="text-center px-4 py-3 font-medium" style={{ color: '#4B5563' }}>Stockout Wk</th>
+                        <th className="text-center px-4 py-3 font-medium" style={{ color: '#4B5563' }}>Release By</th>
+                        <th className="text-right px-4 py-3 font-medium" style={{ color: '#4B5563' }}>Order Qty</th>
+                        <th className="text-left px-4 py-3 font-medium w-8"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#F2F4F7]">
+                    <tbody className="divide-y divide-[#E4DDD3]">
                       {visibleRows.map((row, i) => (
-                        <tr key={`${row.sku}-${i}`} className="hover:bg-[#FAFAFA] transition-colors">
+                        <tr key={`${row.sku}-${i}`} className="hover:bg-[#F4F2EE] transition-colors">
 
                           {/* Priority badge */}
                           <td className="px-4 py-3">
                             {row.flag === 'RELEASE_PO' ? (
-                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-medium text-[11px]">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium text-[11px]" style={{ background: '#FAEAEA', color: '#C5453F', border: '1px solid #F5C6C4' }}>
                                 <AlertTriangle size={10} /> Release PO
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded-full font-medium text-[11px]">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium text-[11px]" style={{ background: '#FEF3E2', color: '#E8A33D', border: '1px solid #F9DEB8' }}>
                                 <Clock size={10} /> Plan PO
                               </span>
                             )}
                           </td>
 
-                          <td className="px-4 py-3 text-[#344054] font-medium">{row.brand}</td>
-                          <td className="px-4 py-3 text-[#101828] font-mono font-medium">{row.sku}</td>
-                          <td className="px-4 py-3 text-[#667085] max-w-[200px] truncate" title={row.description}>
+                          <td className="px-4 py-3 font-medium" style={{ color: '#1F2937' }}>{row.brand}</td>
+                          <td className="px-4 py-3 font-mono font-medium" style={{ color: '#1F2937' }}>{row.sku}</td>
+                          <td className="px-4 py-3 max-w-[200px] truncate" style={{ color: '#4B5563' }} title={row.description}>
                             {row.description}
                           </td>
 
                           {/* LT */}
-                          <td className="px-4 py-3 text-center text-[#344054]">{row.leadTimeWk}</td>
+                          <td className="px-4 py-3 text-center" style={{ color: '#1F2937' }}>{row.leadTimeWk}</td>
 
                           {/* WoC — colour by urgency */}
                           <td className="px-4 py-3 text-center font-medium" style={{
-                            color: row.woc < 4 ? '#B42318' : row.woc < 8 ? '#B54708' : '#344054'
+                            color: row.woc < 4 ? '#C5453F' : row.woc < 8 ? '#E8A33D' : '#1F2937'
                           }}>{row.woc}</td>
 
                           {/* Stockout week */}
-                          <td className="px-4 py-3 text-center text-[#344054]">{row.stockoutWk}</td>
+                          <td className="px-4 py-3 text-center" style={{ color: '#1F2937' }}>{row.stockoutWk}</td>
 
                           {/* Release by — flag overdue in red */}
                           <td className="px-4 py-3 text-center">
-                            <span className={`font-medium ${
-                              row.releaseByWk !== '—' && row.releaseByWk <= CURRENT_WK
-                                ? 'text-[#B42318]'
-                                : 'text-[#344054]'
-                            }`}>
+                            <span style={{
+                              fontWeight: 500,
+                              color: row.releaseByWk !== '—' && row.releaseByWk <= CURRENT_WK ? '#C5453F' : '#1F2937'
+                            }}>
                               {row.releaseByWk}
                             </span>
                             {row.releaseDateLabel !== '—' && (
-                              <div className="text-[#98A2B3] text-[10px]">{row.releaseDateLabel}</div>
+                              <div className="text-[10px]" style={{ color: '#4B5563' }}>{row.releaseDateLabel}</div>
                             )}
- 
+                          </td>
+
+                          {/* Order qty */}
+                          <td className="px-4 py-3 text-right font-medium" style={{ color: '#1F2937' }}>
+                            {row.orderQty.toLocaleString()}
+                            <span className="font-normal ml-1" style={{ color: '#4B5563' }}>{row.uom}</span>
+                          </td>
+
+                          {/* Note tooltip */}
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              title={row.note}
+                              className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium cursor-help"
+                              style={{ background: '#E4DDD3', color: '#4B5563' }}
+                            >
+                              ?
+                            </span>
+                          </td>
+
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

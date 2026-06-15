@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/layout/Sidebar'
@@ -12,7 +12,7 @@ import type { ComponentMaster, ComponentMrpResult } from '@/lib/bom-mrp'
 const ForecastChart = dynamic(
   () => import('@/components/sd/ForecastChart'),
   { ssr: false, loading: () => (
-    <div className="bg-white rounded-xl border border-[#EAECF0] p-5 mt-4 h-32 flex items-center justify-center text-sm text-[#98A2B3]">
+    <div className="bg-white rounded-xl p-5 mt-4 h-32 flex items-center justify-center text-sm" style={{ border: '1px solid #E4DDD3', color: '#4B5563' }}>
       Loading forecast chart...
     </div>
   )}
@@ -166,7 +166,7 @@ export default function ProjectPage() {
     setSkuResults(results)
     if (results.length > 0) setSelectedSku(results[0].sku.sku)
 
-    // BOM MRP
+    // ── BOM MRP ───────────────────────────────────────────────────────────────
     if (allProjectIds.length > 0) {
       const { data: fgParts } = await supabase
         .from('parts')
@@ -174,6 +174,7 @@ export default function ProjectPage() {
         .in('project_id', allProjectIds)
         .eq('category', 'FG')
 
+      // Pick the FG part whose master_sku_ref matches the currently selected SKU, else first FG with a ref
       const fgPart = (fgParts || []).find((p: any) => p.master_sku_ref === results[0]?.sku.sku)
         ?? (fgParts || []).find((p: any) => p.master_sku_ref != null)
         ?? fgParts?.[0]
@@ -182,7 +183,7 @@ export default function ProjectPage() {
 
         const { data: bomData } = await supabase
           .from('bom_lines')
-          .select('id, parent_pn, child_pn, bom_level, qty_per, uom')
+          .select('id, parent_pn, child_pn, bom_level, qty_per, uom, child:parts!bom_lines_child_pn_fkey(part_number, description, category, uom, on_hand_qty)')
           .eq('is_active', true)
 
         const { data: projectParts } = await supabase
@@ -196,8 +197,8 @@ export default function ProjectPage() {
           .map((bl: any) => ({
             partNumber: bl.child_pn,
             parentPn: bl.parent_pn,
-            description: bl.child_pn,
-            category: 'RM' as const,
+            description: bl.child?.description || bl.child_pn,
+            category: bl.child?.category || 'RM',
             bomLevel: bl.bom_level,
             qtyPer: parseFloat(bl.qty_per),
             uom: bl.uom,
@@ -246,6 +247,8 @@ export default function ProjectPage() {
           fgSkuResult.weeks.forEach(w => fgDemandMap.set(w.wkLabel, w.forecastQty))
         }
 
+        console.log('[MRP debug] fgPart:', fgPart?.part_number, 'bomLines:', bomLines.length, 'components:', components.length, 'compPns:', compPns)
+
         if (bomLines.length > 0 && components.length > 0) {
           const mrp = computeMRP({
             fgPartNumber: fgPart.part_number,
@@ -276,30 +279,36 @@ export default function ProjectPage() {
   }
 
   const alertBg: Record<string, string> = {
-    STOCKOUT:   'bg-red-50 border-red-200 text-red-800',
-    RELEASE_PO: 'bg-amber-50 border-amber-200 text-amber-900',
-    PLAN_PO:    'bg-yellow-50 border-yellow-200 text-yellow-900',
-    OK:         'bg-green-50 border-green-200 text-green-800',
+    STOCKOUT:   '',
+    RELEASE_PO: '',
+    PLAN_PO:    '',
+    OK:         '',
+  }
+  const alertStyle: Record<string, React.CSSProperties> = {
+    STOCKOUT:   { background: '#FAEAEA', border: '1px solid #F5C6C4', color: '#C5453F' },
+    RELEASE_PO: { background: '#FEF3E2', border: '1px solid #F9DEB8', color: '#E8A33D' },
+    PLAN_PO:    { background: '#FEF3E2', border: '1px solid #F9DEB8', color: '#E8A33D' },
+    OK:         { background: '#DCEAE8', border: '1px solid #DCEAE8', color: '#0E5C56' },
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F0F2F5]">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F4F2EE' }}>
       <Sidebar userEmail={profile?.email} userName={profile?.full_name}
         userRole={profile?.role} brands={brands} activeBrand={brand} />
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        <div className="bg-white border-b border-[#EAECF0] px-6 py-3 flex items-center justify-between">
+        <div className="bg-white px-6 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E4DDD3' }}>
           <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold text-[#101828]">Supply &amp; Demand</h1>
-            <span className="bg-[#ECFDF3] text-[#027A48] border border-[#ABEFC6] text-xs px-2.5 py-1 rounded-full font-medium">{brand}</span>
-            <span className="bg-[#F2F4F7] text-[#667085] text-xs px-2.5 py-1 rounded-full">{CURRENT_WK} 2026</span>
+            <h1 className="text-sm font-semibold" style={{ color: '#1F2937', fontFamily: 'Cambria, Georgia, serif' }}>Supply & Demand</h1>
+            <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: '#DCEAE8', color: '#0E5C56', border: '1px solid #DCEAE8' }}>{brand}</span>
+            <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: '#E4DDD3', color: '#4B5563' }}>{CURRENT_WK} 2026</span>
           </div>
           <div className="flex items-center gap-2">
-            {lastUpdated && <span className="text-xs text-[#98A2B3]">Inventory: {lastUpdated}</span>}
-            <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB]">
+            {lastUpdated && <span className="text-xs" style={{ color: '#4B5563' }}>Inventory: {lastUpdated}</span>}
+            <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#E4DDD3] rounded-lg hover:bg-[#F4F2EE]" style={{ color: '#4B5563' }}>
               <Download size={12} /> Export
             </button>
-            <button onClick={loadAll} className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#D0D5DD] rounded-lg text-[#344054] hover:bg-[#F9FAFB]">
+            <button onClick={loadAll} className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#E4DDD3] rounded-lg hover:bg-[#F4F2EE]" style={{ color: '#4B5563' }}>
               <RefreshCw size={12} /> Refresh
             </button>
           </div>
@@ -307,38 +316,39 @@ export default function ProjectPage() {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-[#667085] text-sm">Loading S&amp;D data...</div>
+            <div className="flex items-center justify-center h-40 text-sm" style={{ color: '#4B5563' }}>Loading S&D data...</div>
           ) : (
             <>
               {currentSkuResult && flag && (
                 <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">On-Hand ({currentSkuResult.sku.sku})</div>
-                    <div className="text-2xl font-semibold text-[#101828]">{currentSkuResult.onHand.toLocaleString()}</div>
-                    <div className="text-xs mt-1 text-[#667085]">units in stock</div>
+                  <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+                    <div className="text-xs mb-1" style={{ color: '#4B5563' }}>On-Hand ({currentSkuResult.sku.sku})</div>
+                    <div className="text-2xl font-semibold" style={{ color: '#1F2937', fontFamily: 'Cambria, Georgia, serif' }}>{currentSkuResult.onHand.toLocaleString()}</div>
+                    <div className="text-xs mt-1" style={{ color: '#4B5563' }}>units in stock</div>
                   </div>
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">Weeks of Cover</div>
+                  <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+                    <div className="text-xs mb-1" style={{ color: '#4B5563' }}>Weeks of Cover</div>
                     <div className="text-2xl font-semibold" style={{
-                      color: currentSkuResult.weeksOfCover < 0 ? '#B42318' : currentSkuResult.weeksOfCover < 4 ? '#B54708' : '#027A48'
+                      color: currentSkuResult.weeksOfCover < 0 ? '#C5453F' : currentSkuResult.weeksOfCover < 4 ? '#E8A33D' : '#2F9E68',
+                      fontFamily: 'Cambria, Georgia, serif'
                     }}>{currentSkuResult.weeksOfCover}</div>
-                    <div className="text-xs mt-1 text-[#667085]">Target: &ge; 8 wks</div>
+                    <div className="text-xs mt-1" style={{ color: '#4B5563' }}>Target: ≥ 8 wks</div>
                   </div>
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">Next PO (Commit)</div>
-                    <div className="text-2xl font-semibold text-[#101828]">
+                  <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+                    <div className="text-xs mb-1" style={{ color: '#4B5563' }}>Next PO (Commit)</div>
+                    <div className="text-2xl font-semibold" style={{ color: '#1F2937', fontFamily: 'Cambria, Georgia, serif' }}>
                       {nextCommit ? nextCommit.supplyCommit.toLocaleString() : '—'}
                     </div>
-                    <div className="text-xs mt-1 text-[#667085]">
+                    <div className="text-xs mt-1" style={{ color: '#4B5563' }}>
                       {nextCommit ? `ETA: ${nextCommit.wkLabel}` : 'No open PO'}
                     </div>
                   </div>
-                  <div className="bg-white rounded-xl border border-[#EAECF0] p-4">
-                    <div className="text-xs text-[#667085] mb-1">Status</div>
-                    <div className="text-lg font-semibold flex items-center gap-1.5 mt-1" style={{ color: flag.color }}>
+                  <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+                    <div className="text-xs mb-1" style={{ color: '#4B5563' }}>Status</div>
+                    <div className="text-lg font-semibold flex items-center gap-1.5 mt-1" style={{ color: flag.color, fontFamily: 'Cambria, Georgia, serif' }}>
                       <span>{flag.emoji}</span><span>{flag.label}</span>
                     </div>
-                    <div className="text-xs mt-1 text-[#667085]">
+                    <div className="text-xs mt-1" style={{ color: '#4B5563' }}>
                       {currentSkuResult.flag === 'RELEASE_PO' && `Release by ${currentSkuResult.plannedPoReleaseDateWk ?? '—'}`}
                       {currentSkuResult.flag === 'PLAN_PO' && `Plan by ${currentSkuResult.plannedPoReleaseDateWk ?? '—'}`}
                       {currentSkuResult.flag === 'STOCKOUT' && 'Urgent action required'}
@@ -349,20 +359,20 @@ export default function ProjectPage() {
               )}
 
               {currentSkuResult && currentSkuResult.flag !== 'OK' && (
-                <div className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${alertBg[currentSkuResult.flag]}`}>
+                <div className="flex items-start justify-between gap-3 px-4 py-3 rounded-xl text-sm" style={alertStyle[currentSkuResult.flag]}>
                   <p className="text-sm leading-relaxed">{getAlertMessage(currentSkuResult)}</p>
                   <span className="text-xs font-medium whitespace-nowrap cursor-pointer opacity-70 hover:opacity-100">View PO →</span>
                 </div>
               )}
 
-              <div className="bg-white rounded-xl border border-[#EAECF0] p-5">
+              <div className="bg-white rounded-xl p-5" style={{ border: '1px solid #E4DDD3' }}>
                 <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-sm font-semibold text-[#344054]">Weekly Supply &amp; Demand</h2>
-                  <span className="text-xs text-[#98A2B3]">Rolling 52 weeks from {CURRENT_WK}</span>
+                  <h2 className="text-sm font-semibold" style={{ color: '#1F2937', fontFamily: 'Cambria, Georgia, serif' }}>Weekly Supply & Demand</h2>
+                  <span className="text-xs" style={{ color: '#4B5563' }}>Rolling 52 weeks from {CURRENT_WK}</span>
                 </div>
                 {skuResults.length > 0 && weeks.length > 0
                   ? <SDTable skus={skuResults} weeks={weeks} currentWk={CURRENT_WK} selectedSku={selectedSku} onSkuChange={setSelectedSku} />
-                  : <div className="text-sm text-[#667085] text-center py-8">No SKU data found for {brand}</div>}
+                  : <div className="text-sm text-center py-8" style={{ color: '#4B5563' }}>No SKU data found for {brand}</div>}
               </div>
 
               {skuResults.length > 0 && (

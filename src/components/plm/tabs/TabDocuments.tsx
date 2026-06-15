@@ -9,7 +9,7 @@ type DocType = typeof DOC_TYPES[number]
 
 const FILE_STYLE: Record<string, { bg: string; color: string }> = {
   pdf: { bg: '#FEF2F2', color: '#dc2626' },
-  ai:  { bg: '#FFFBEB', color: '#d97706' },
+  ai:  { bg: '#FEF3E2', color: '#E8A33D' },
   dwg: { bg: '#EFF6FF', color: '#2563eb' },
   png: { bg: '#F0FDF4', color: '#16a34a' },
 }
@@ -32,7 +32,7 @@ export default function TabDocuments({ pn }: { pn: string }) {
 
   useEffect(() => { fetchDocs() }, [pn])
 
-  if (loading) return <div className="text-sm text-[#667085] p-4">Loading documents...</div>
+  if (loading) return <div className="text-sm text-[#4B5563] p-4">Loading documents...</div>
 
   const current = docs.filter(d => d.is_current)
   const archived = docs.filter(d => !d.is_current)
@@ -41,12 +41,12 @@ export default function TabDocuments({ pn }: { pn: string }) {
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-sm font-semibold text-[#101828]">Documents</h2>
-          <p className="text-xs text-[#667085] mt-0.5">Drawings, spec sheets, artwork attached to {pn}.</p>
+          <h2 className="text-sm font-semibold text-[#1F2937]">Documents</h2>
+          <p className="text-xs text-[#4B5563] mt-0.5">Drawings, spec sheets, artwork attached to {pn}.</p>
         </div>
         <button
           onClick={() => setShowUpload(true)}
-          className="flex items-center gap-1.5 text-xs text-[#048A81] border border-[#048A81]/30 rounded-lg px-3 py-1.5 hover:bg-[#F0FDF9] transition-colors">
+          className="flex items-center gap-1.5 text-xs text-[#0E5C56] border border-[#0E5C56]/30 rounded-lg px-3 py-1.5 hover:bg-[#DCEAE8] transition-colors">
           <Upload size={13} /> Upload
         </button>
       </div>
@@ -60,17 +60,17 @@ export default function TabDocuments({ pn }: { pn: string }) {
       )}
 
       {docs.length === 0 ? (
-        <div className="bg-white rounded-xl border border-[#EAECF0] p-8 flex flex-col items-center gap-2">
-          <FileText size={28} className="text-[#D0D5DD]" />
-          <div className="text-sm text-[#344054] font-medium">No documents yet</div>
-          <div className="text-xs text-[#667085]">Upload spec sheet, drawing or artwork</div>
+        <div className="bg-white rounded-xl border border-[#E4DDD3] p-8 flex flex-col items-center gap-2">
+          <FileText size={28} className="text-[#E4DDD3]" />
+          <div className="text-sm text-[#1F2937] font-medium">No documents yet</div>
+          <div className="text-xs text-[#4B5563]">Upload spec sheet, drawing or artwork</div>
         </div>
       ) : (
         <div className="space-y-2">
           {current.map(d => <DocRow key={d.id} doc={d} pn={pn} />)}
           {archived.length > 0 && (
             <>
-              <div className="text-xs text-[#667085] uppercase tracking-wider pt-3">Archived</div>
+              <div className="text-xs text-[#4B5563] uppercase tracking-wider pt-3">Archived</div>
               {archived.map(d => <DocRow key={d.id} doc={d} pn={pn} archived />)}
             </>
           )}
@@ -142,9 +142,9 @@ function UploadModal({ pn, onClose, onUploaded }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EAECF0]">
-          <h3 className="text-sm font-semibold text-[#101828]">Upload Document</h3>
-          <button onClick={onClose} className="text-[#667085] hover:text-[#344054]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E4DDD3]">
+          <h3 className="text-sm font-semibold text-[#1F2937]">Upload Document</h3>
+          <button onClick={onClose} className="text-[#4B5563] hover:text-[#1F2937]">
             <X size={16} />
           </button>
         </div>
@@ -153,7 +153,7 @@ function UploadModal({ pn, onClose, onUploaded }: {
 
           {/* File picker -- click or drag-and-drop */}
           <div>
-            <label className="block text-xs font-medium text-[#344054] mb-1">File</label>
+            <label className="block text-xs font-medium text-[#1F2937] mb-1">File</label>
             <div
               onClick={() => fileRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -162,27 +162,27 @@ function UploadModal({ pn, onClose, onUploaded }: {
               onDrop={handleDrop}
               className="border-2 border-dashed rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer transition-colors"
               style={{
-                borderColor: dragging ? '#048A81' : file ? '#048A81' : '#D0D5DD',
-                background: dragging ? '#F0FDF9' : file ? '#F0FDF9' : 'transparent',
+                borderColor: dragging ? '#0E5C56' : file ? '#0E5C56' : '#E4DDD3',
+                background: dragging ? '#DCEAE8' : file ? '#DCEAE8' : 'transparent',
               }}>
               <Upload
                 size={20}
-                style={{ color: dragging || file ? '#048A81' : '#D0D5DD' }}
+                style={{ color: dragging || file ? '#0E5C56' : '#E4DDD3' }}
               />
               {file ? (
                 <div className="text-center">
-                  <div className="text-xs font-medium text-[#048A81]">{file.name}</div>
-                  <div className="text-[10px] text-[#667085] mt-0.5">
+                  <div className="text-xs font-medium text-[#0E5C56]">{file.name}</div>
+                  <div className="text-[10px] text-[#4B5563] mt-0.5">
                     {(file.size / 1024).toFixed(0)} KB &mdash; click to change
                   </div>
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="text-xs text-[#667085]">
+                  <div className="text-xs text-[#4B5563]">
                     Drag &amp; drop or{' '}
-                    <span className="text-[#048A81] font-medium">click to choose</span>
+                    <span className="text-[#0E5C56] font-medium">click to choose</span>
                   </div>
-                  <div className="text-[10px] text-[#667085] mt-0.5">PDF, DWG, PNG, AI...</div>
+                  <div className="text-[10px] text-[#4B5563] mt-0.5">PDF, DWG, PNG, AI...</div>
                 </div>
               )}
             </div>
@@ -196,11 +196,11 @@ function UploadModal({ pn, onClose, onUploaded }: {
 
           {/* Doc type */}
           <div>
-            <label className="block text-xs font-medium text-[#344054] mb-1">Document type</label>
+            <label className="block text-xs font-medium text-[#1F2937] mb-1">Document type</label>
             <select
               value={docType}
               onChange={e => setDocType(e.target.value as DocType)}
-              className="w-full text-xs border border-[#D0D5DD] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#048A81]/30">
+              className="w-full text-xs border border-[#E4DDD3] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0E5C56]/30">
               {DOC_TYPES.map(t => (
                 <option key={t} value={t}>
                   {t.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
@@ -211,13 +211,13 @@ function UploadModal({ pn, onClose, onUploaded }: {
 
           {/* Version */}
           <div>
-            <label className="block text-xs font-medium text-[#344054] mb-1">Version</label>
+            <label className="block text-xs font-medium text-[#1F2937] mb-1">Version</label>
             <input
               type="text"
               value={version}
               onChange={e => setVersion(e.target.value)}
               placeholder="e.g. v1.0, Rev A"
-              className="w-full text-xs border border-[#D0D5DD] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#048A81]/30"
+              className="w-full text-xs border border-[#E4DDD3] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0E5C56]/30"
             />
           </div>
 
@@ -226,17 +226,17 @@ function UploadModal({ pn, onClose, onUploaded }: {
           )}
         </div>
 
-        <div className="flex gap-2 px-5 py-4 border-t border-[#EAECF0]">
+        <div className="flex gap-2 px-5 py-4 border-t border-[#E4DDD3]">
           <button
             onClick={onClose}
             disabled={uploading}
-            className="flex-1 text-xs border border-[#D0D5DD] rounded-lg py-2 text-[#344054] hover:bg-[#F9FAFB] transition-colors disabled:opacity-50">
+            className="flex-1 text-xs border border-[#E4DDD3] rounded-lg py-2 text-[#1F2937] hover:bg-[#F4F2EE] transition-colors disabled:opacity-50">
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!file || uploading}
-            className="flex-1 text-xs bg-[#048A81] text-white rounded-lg py-2 flex items-center justify-center gap-1.5 hover:bg-[#037068] transition-colors disabled:opacity-50">
+            className="flex-1 text-xs bg-[#0E5C56] text-white rounded-lg py-2 flex items-center justify-center gap-1.5 hover:bg-[#037068] transition-colors disabled:opacity-50">
             {uploading ? (
               <><Loader2 size={13} className="animate-spin" /> Uploading...</>
             ) : (
@@ -251,12 +251,12 @@ function UploadModal({ pn, onClose, onUploaded }: {
 
 // -- Doc Row ------------------------------------------------------------------
 
-const ROW_CLS = 'flex items-center gap-3 p-3 bg-white border border-[#EAECF0] rounded-xl cursor-pointer transition-all'
-const ROW_HOVER = 'hover:border-[#048A81]/40 hover:bg-[#F0FDF9]'
+const ROW_CLS = 'flex items-center gap-3 p-3 bg-white border border-[#E4DDD3] rounded-xl cursor-pointer transition-all'
+const ROW_HOVER = 'hover:border-[#0E5C56]/40 hover:bg-[#DCEAE8]'
 
 function DocRow({ doc, pn, archived }: { doc: PlmDocument; pn: string; archived?: boolean }) {
   const ext = (doc.file_name.split('.').pop() ?? 'file').toLowerCase()
-  const style = FILE_STYLE[ext] ?? { bg: '#F9FAFB', color: '#667085' }
+  const style = FILE_STYLE[ext] ?? { bg: '#F4F2EE', color: '#4B5563' }
 
   const openDoc = async () => {
     const supabase = createClient()
@@ -281,8 +281,8 @@ function DocRow({ doc, pn, archived }: { doc: PlmDocument; pn: string; archived?
         {ext}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-[#344054] truncate">{doc.file_name}</div>
-        <div className="text-xs text-[#667085] font-mono mt-0.5">
+        <div className="text-sm text-[#1F2937] truncate">{doc.file_name}</div>
+        <div className="text-xs text-[#4B5563] font-mono mt-0.5">
           v{doc.version} &middot; {doc.doc_type} &middot;{' '}
           {new Date(doc.uploaded_at).toLocaleDateString('en-MY')}
         </div>
@@ -290,11 +290,11 @@ function DocRow({ doc, pn, archived }: { doc: PlmDocument; pn: string; archived?
       <span
         className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
         style={archived
-          ? { background: '#F2F4F7', color: '#667085' }
-          : { background: '#F0FDF9', color: '#048A81' }}>
+          ? { background: '#E4DDD3', color: '#4B5563' }
+          : { background: '#DCEAE8', color: '#0E5C56' }}>
         {archived ? 'Archived' : 'Current'}
       </span>
-      <Download size={14} className="text-[#D0D5DD] flex-shrink-0" />
+      <Download size={14} className="text-[#E4DDD3] flex-shrink-0" />
     </div>
   )
 }
