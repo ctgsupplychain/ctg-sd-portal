@@ -36,76 +36,6 @@ type EditingCell = { id: number; field: string } | null
 
 const STATUS_OPTIONS = ['Open', 'Received', 'Cancelled', 'Closed']
 
-function EditableCell({
-  id, field, value, align = 'right', display, inputType = 'text', inputMode, selectOptions,
-  editingCell, editValue, setEditValue, saveError, startEdit, commitEdit, cancelEdit, handleKeyDown, inputRef,
-}: {
-  id: number
-  field: string
-  value: string | number | null
-  align?: 'left' | 'right'
-  display: React.ReactNode
-  inputType?: string
-  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
-  selectOptions?: string[]
-  editingCell: EditingCell
-  editValue: string
-  setEditValue: (v: string) => void
-  saveError: { id: number; msg: string } | null
-  startEdit: (id: number, field: string, value: string | number | null) => void
-  commitEdit: () => void
-  cancelEdit: () => void
-  handleKeyDown: (e: React.KeyboardEvent) => void
-  inputRef: React.RefObject<HTMLInputElement | HTMLSelectElement>
-}) {
-  const isEditing = editingCell?.id === id && editingCell?.field === field
-  const hasError = saveError?.id === id
-
-  if (isEditing) {
-    return (
-      <td className="px-2 py-1.5">
-        <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
-          {selectOptions ? (
-            <select
-              ref={inputRef as React.RefObject<HTMLSelectElement>}
-              value={editValue}
-              onChange={e => setEditValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
-            >
-              {selectOptions.map(o => <option key={o}>{o}</option>)}
-            </select>
-          ) : (
-            <input
-              ref={inputRef as React.RefObject<HTMLInputElement>}
-              type={inputType}
-              inputMode={inputMode}
-              value={editValue}
-              onChange={e => setEditValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="w-24 text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
-            />
-          )}
-          <button onClick={commitEdit} className="text-[#0E5C56] hover:text-[#0E5C56]"><Check size={12} /></button>
-          <button onClick={cancelEdit} className="text-[#4B5563] hover:text-[#4B5563]"><X size={12} /></button>
-        </div>
-      </td>
-    )
-  }
-
-  return (
-    <td
-      className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-[#FAEAEA]' : 'hover:bg-[#DCEAE8]'}`}
-      onClick={() => startEdit(id, field, value)}
-      title="Click to edit"
-    >
-      <span className="group-hover:underline group-hover:decoration-dashed group-hover:decoration-teal-400 group-hover:underline-offset-2">
-        {display}
-      </span>
-    </td>
-  )
-}
-
 export default function SupplyInputPage() {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -281,15 +211,72 @@ export default function SupplyInputPage() {
     return p.status === 'Open' && !!p.delivery_date && p.delivery_date < today && (p.balance_qty ?? p.qty) > 0
   }
 
-  // EditableCell is defined outside this component to prevent remount on every render
-  const cellProps = { editingCell, editValue, setEditValue, saveError, startEdit, commitEdit, cancelEdit, handleKeyDown, inputRef }
+  // Editable cell renderer
+  function EditableCell({
+    id, field, value, align = 'right', display, inputType = 'text', selectOptions,
+  }: {
+    id: number
+    field: string
+    value: string | number | null
+    align?: 'left' | 'right'
+    display: React.ReactNode
+    inputType?: string
+    selectOptions?: string[]
+  }) {
+    const isEditing = editingCell?.id === id && editingCell?.field === field
+    const hasError = saveError?.id === id
+
+    if (isEditing) {
+      return (
+        <td className="px-2 py-1.5">
+          <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+            {selectOptions ? (
+              <select
+                ref={inputRef as React.RefObject<HTMLSelectElement>}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+              >
+                {selectOptions.map(o => <option key={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input
+                ref={inputRef as React.RefObject<HTMLInputElement>}
+                type={inputType}
+                inputMode={inputMode}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-24 text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
+              />
+            )}
+            <button onClick={commitEdit} className="text-[#0E5C56] hover:text-[#0E5C56]"><Check size={12} /></button>
+            <button onClick={cancelEdit} className="text-[#4B5563] hover:text-[#4B5563]"><X size={12} /></button>
+          </div>
+        </td>
+      )
+    }
+
+    return (
+      <td
+        className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-[#FAEAEA]' : 'hover:bg-[#DCEAE8]'}`}
+        onClick={() => startEdit(id, field, value)}
+        title="Click to edit"
+      >
+        <span className="group-hover:underline group-hover:decoration-dashed group-hover:decoration-teal-400 group-hover:underline-offset-2">
+          {display}
+        </span>
+      </td>
+    )
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
       <div className="flex items-center gap-3 mb-6">
         <BackToSD />
         <div className="w-px h-4 bg-[#E4DDD3]" />
-        <h1 className="text-sm font-semibold text-[#1F2937]">Supply Input — Open POs</h1>
+        <h1 className="text-sm font-semibold text-[#1F2937]">Supply Input â Open POs</h1>
       </div>
       <p className="text-sm text-[#4B5563] mb-8">
         Upload the weekly Open PO file (.xlsx). Records are upserted by PO Number + SKU. Missing POs are kept as-is.
@@ -371,14 +358,14 @@ export default function SupplyInputPage() {
             <div className="mt-2 bg-[#FEF3E2] border border-[#F9DEB8] rounded-md px-3 py-2">
               <p className="text-xs font-medium text-yellow-800 mb-1">Unrecognized SKUs (not saved):</p>
               <ul className="text-xs text-[#E8A33D] space-y-0.5">
-                {result.invalid_skus.map(sku => <li key={sku}>• {sku}</li>)}
+                {result.invalid_skus.map(sku => <li key={sku}>â¢ {sku}</li>)}
               </ul>
             </div>
           )}
         </div>
       )}
 
-      {/* ───────────── PO List ───────────── */}
+      {/* âââââââââââââ PO List âââââââââââââ */}
       <div className="mt-10">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h2 className="text-sm font-semibold text-[#1F2937]">Current Open POs</h2>
@@ -449,67 +436,85 @@ export default function SupplyInputPage() {
                   const delayed = isDelayed(p)
                   return (
                     <tr key={p.id} className={`border-b border-[#E4DDD3] last:border-0 transition-colors ${delayed ? 'bg-[#FAEAEA]/40' : ''}`}>
-                      {/* PO Number — read only */}
+                      {/* PO Number â read only */}
                       <td className="px-3 py-2.5">
                         <span className="font-mono text-[11px] text-[#1F2937]">{p.po_number}</span>
                         {delayed && (
                           <span className="ml-2 inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#FAEAEA] text-[#C5453F] align-middle">Delayed</span>
                         )}
                       </td>
-                      {/* SKU — read only */}
+                      {/* SKU â read only */}
                       <td className="px-3 py-2.5">
                         <span className="font-mono text-[11px] text-[#1F2937]">{p.sku}</span>
                         {p.brand && <p className="text-[10px] text-[#4B5563] mt-0.5">{p.brand}</p>}
                       </td>
-                      {/* Supplier — editable */}
+                      {/* Supplier â editable */}
                       <EditableCell
-                        {...cellProps}
                         id={p.id} field="supplier_name" value={p.supplier_name} align="left"
-                        display={<span className="text-xs text-[#4B5563]">{p.supplier_name || '—'}</span>}
+                        display={<span className="text-xs text-[#4B5563]">{p.supplier_name || 'â'}</span>}
                       />
-                      {/* Qty — editable */}
+                      {/* Qty â editable */}
                       <EditableCell
-                        {...cellProps}
-                        id={p.id} field="qty" value={p.qty} inputType="text" inputMode="numeric"
+                        id={p.id} field="qty" value={p.qty} inputType="number"
                         display={<span className="text-xs text-[#1F2937]">{p.qty?.toLocaleString()}</span>}
                       />
-                      {/* Qty Shipped — editable */}
+                      {/* Qty Shipped â editable */}
                       <EditableCell
-                        {...cellProps}
-                        id={p.id} field="qty_shipped" value={p.qty_shipped} inputType="text" inputMode="numeric"
+                        id={p.id} field="qty_shipped" value={p.qty_shipped} inputType="number"
                         display={<span className="text-xs text-[#4B5563]">{(p.qty_shipped ?? 0).toLocaleString()}</span>}
                       />
-                      {/* Balance — read only (server computed) */}
+                      {/* Balance â read only (server computed) */}
                       <td className="px-3 py-2.5 text-right">
                         <span className={`text-xs font-medium ${(p.balance_qty ?? 0) > 0 ? 'text-amber-600' : 'text-[#4B5563]'}`}>
                           {(p.balance_qty ?? p.qty)?.toLocaleString()}
                         </span>
                       </td>
-                      {/* Unit price — editable */}
+                      {/* Unit price â editable */}
                       <EditableCell
-                        {...cellProps}
-                        id={p.id} field="unit_price" value={p.unit_price} inputType="text" inputMode="decimal"
+                        id={p.id} field="unit_price" value={p.unit_price} inputType="number"
                         display={<span className="font-mono text-xs text-[#1F2937]">{Number(p.unit_price ?? 0).toFixed(2)}</span>}
                       />
-                      {/* Delivery date — editable */}
+                      {/* Delivery date â editable */}
                       <EditableCell
-                        {...cellProps}
                         id={p.id} field="delivery_date" value={p.delivery_date} inputType="date"
                         display={
                           p.delivery_date
                             ? <span className={`text-xs ${delayed ? 'text-[#C5453F] font-medium' : 'text-[#4B5563]'}`}>{p.delivery_date}</span>
-                            : <span className="text-[#4B5563] text-xs">—</span>
+                            : <span className="text-[#4B5563] text-xs">â</span>
                         }
                       />
-                      {/* Receipt week — read only (derived) */}
+                      {/* Receipt week â read only (derived) */}
                       <td className="px-3 py-2.5 text-right">
-                        <span className="text-xs text-[#4B5563]">{p.receipt_wk || '—'}</span>
+                        <span className="text-xs text-[#4B5563]">{p.receipt_wk || 'â'}</span>
                       </td>
-                      {/* Status — editable */}
+                      {/* Status â editable */}
                       <EditableCell
-                        {...cellProps}
                         id={p.id} field="status" value={p.status}
                         selectOptions={STATUS_OPTIONS}
                         display={
                           <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${
-         
+                            p.status === 'Open' ? 'bg-[#FEF3E2] text-[#E8A33D]'
+                            : p.status === 'Received' ? 'bg-[#DCEAE8] text-[#0E5C56]'
+                            : 'bg-[#E4DDD3] text-[#4B5563]'
+                          }`}>{p.status}</span>
+                        }
+                      />
+                    </tr>
+                  )
+                })}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-[#4B5563]">No POs match your filters</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="text-[11px] text-[#4B5563] mt-3">
+          Click Supplier, Qty, Shipped, Unit Price, Delivery Date, or Status to edit inline Â· Enter to save Â· Esc to cancel Â·
+          Balance and Receipt Week are recalculated automatically Â· Bulk changes via Upload above
+        </p>
+      </div>
+    </div>
+  )
+}
