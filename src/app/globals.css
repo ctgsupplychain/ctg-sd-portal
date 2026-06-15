@@ -15,13 +15,6 @@
   --green: #2F9E68;
   --font-heading: Cambria, Georgia, "Times New Roman", serif;
   --font-body: Calibri, "Segoe UI", Tahoma, sans-serif;
-
-  /* Deprecated aliases — retained during migration, remove once unused */
-  --color-dark: #1A2535;
-  --color-accent: #048A81;
-  --color-warn: #E07B39;
-  --color-danger: #B42318;
-  --color-ok: #166534;
 }
 
 body {

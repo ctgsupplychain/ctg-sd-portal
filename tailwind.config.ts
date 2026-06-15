@@ -19,12 +19,6 @@ const config: Config = {
         amber: '#E8A33D',
         red: '#C5453F',
         green: '#2F9E68',
-        // Deprecated aliases — retained during migration, remove once unused
-        brand: {
-          dark: '#1A2535',
-          accent: '#048A81',
-          warn: '#E07B39',
-        }
       },
       fontFamily: {
         heading: ['Cambria', 'Georgia', '"Times New Roman"', 'serif'],

@@ -36,10 +36,10 @@ function fmt(n: number): string {
 type MrpRowType = 'gross' | 'net' | 'po' | 'release'
 
 const ROW_META: Record<MrpRowType, { bg: string; labelColor: string; cellColor: string }> = {
-  gross:   { bg: 'bg-[#F0FAF0]', labelColor: 'text-[#667085]', cellColor: 'text-[#344054]' },
-  net:     { bg: 'bg-[#F5F5F5]', labelColor: 'text-[#667085]', cellColor: 'text-[#344054]' },
-  po:      { bg: 'bg-[#EFF6FF]', labelColor: 'text-[#667085]', cellColor: 'text-[#1849A9] font-medium' },
-  release: { bg: 'bg-[#1A2535]', labelColor: 'text-[#9DB4CC]', cellColor: 'text-white font-semibold' },
+  gross:   { bg: 'bg-[#DCEAE8]', labelColor: 'text-[#4B5563]', cellColor: 'text-[#1F2937]' },
+  net:     { bg: 'bg-[#F4F2EE]', labelColor: 'text-[#4B5563]', cellColor: 'text-[#1F2937]' },
+  po:      { bg: 'bg-[#E4DDD3]', labelColor: 'text-[#4B5563]', cellColor: 'text-[#1F2937] font-medium' },
+  release: { bg: 'bg-[#1F2937]', labelColor: 'text-[#E4DDD3]', cellColor: 'text-white font-semibold' },
 }
 
 export default function ComponentSD({ results, weeks, currentWk, fgSku, fgDescription }: ComponentSDProps) {
@@ -198,7 +198,7 @@ function ComponentTable({
                   <th
                     key={span.label}
                     colSpan={span.count}
-                    className="bg-[#048A81] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide"
+                    className="bg-[#0E5C56] text-white text-center px-2 py-1.5 font-semibold border-r border-white/20 text-xs tracking-wide"
                   >
                     {span.label}
                   </th>
