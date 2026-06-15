@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { useState } from 'react'
 
 /**
  * Back to S&D button — reads last active brand from sessionStorage
@@ -9,6 +10,7 @@ import { ArrowLeft } from 'lucide-react'
  */
 export default function BackToSD() {
   const router = useRouter()
+  const [hovered, setHovered] = useState(false)
 
   function handleBack() {
     const brand = sessionStorage.getItem('ctg_last_brand')
@@ -18,10 +20,17 @@ export default function BackToSD() {
   return (
     <button
       onClick={handleBack}
-      className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 px-2.5 py-1.5 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors"
+      style={{
+        color: hovered ? '#1F2937' : '#4B5563',
+        borderColor: '#E4DDD3',
+        background: hovered ? '#E4DDD3' : '#F4F2EE',
+      }}
     >
       <ArrowLeft size={13} />
-      Back to S&amp;D
+      Back to S&D
     </button>
   )
 }

@@ -56,62 +56,66 @@ export default function ForecastSyncPage() {
     <div className="max-w-2xl mx-auto px-6 py-10">
       <div className="flex items-center gap-3 mb-6">
         <BackToSD />
-        <div className="w-px h-4 bg-gray-200" />
-        <h1 className="text-sm font-semibold text-gray-900">Forecast Sync</h1>
+        <div className="w-px h-4" style={{ background: '#E4DDD3' }} />
+        <h1 className="text-sm font-semibold" style={{ color: '#1F2937', fontFamily: 'Cambria, Georgia, serif' }}>Forecast Sync</h1>
       </div>
-      <p className="text-sm text-gray-500 mb-2">
+      <p className="text-sm mb-2" style={{ color: '#4B5563' }}>
         Reads latest weekly submissions from Google Sheets and syncs to the portal database.
       </p>
-      <p className="text-xs text-gray-400 mb-8">
-        Uses previous week's submission per project. Falls back to most recent if not found. Carry-forward applied for zero months.
+      <p className="text-xs mb-8" style={{ color: '#4B5563', opacity: 0.7 }}>
+        Uses previous week&apos;s submission per project. Falls back to most recent if not found. Carry-forward applied for zero months.
       </p>
 
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 text-sm text-gray-600">
-        <p className="font-medium text-gray-700 mb-1">Source</p>
-        <p>CTG Sales Forecast — Google Sheet (via service account)</p>
-        {lastSynced && <p className="text-xs text-gray-400 mt-2">Last synced: {lastSynced}</p>}
+      <div className="rounded-xl p-4 mb-6 text-sm" style={{ background: '#F4F2EE', border: '1px solid #E4DDD3', color: '#4B5563' }}>
+        <p className="font-medium mb-1" style={{ color: '#1F2937' }}>Source</p>
+        <p>CTG Sales Forecast &mdash; Google Sheet (via service account)</p>
+        {lastSynced && <p className="text-xs mt-2" style={{ color: '#4B5563', opacity: 0.7 }}>Last synced: {lastSynced}</p>}
       </div>
 
-      <button onClick={handleSync} disabled={loading}
-        className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors">
+      <button
+        onClick={handleSync}
+        disabled={loading}
+        className="w-full text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ background: '#0E5C56' }}
+      >
         {loading ? 'Syncing...' : 'Sync Forecast from Google Sheets'}
       </button>
 
       {error && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="mt-4 rounded-lg px-4 py-3" style={{ background: '#FAEAEA', border: '1px solid #F5C6C4' }}>
+          <p className="text-sm" style={{ color: '#C5453F' }}>{error}</p>
         </div>
       )}
 
       {results.length > 0 && (
         <div className="mt-6 space-y-3">
           <div className="flex gap-4 text-sm">
-            <span className="text-green-700 font-medium">✓ {successCount} synced</span>
-            {failCount > 0 && <span className="text-red-700 font-medium">✗ {failCount} failed</span>}
-            {unmappedCount > 0 && <span className="text-yellow-700 font-medium">⚠ {unmappedCount} unmapped</span>}
+            <span className="font-medium" style={{ color: '#2F9E68' }}>&#10003; {successCount} synced</span>
+            {failCount > 0 && <span className="font-medium" style={{ color: '#C5453F' }}>&#10007; {failCount} failed</span>}
+            {unmappedCount > 0 && <span className="font-medium" style={{ color: '#E8A33D' }}>&#9888; {unmappedCount} unmapped</span>}
           </div>
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E4DDD3' }}>
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
+                <tr style={{ background: '#F4F2EE', borderBottom: '1px solid #E4DDD3' }}>
                   {['Project', 'Brand', 'Week', 'Project ID', 'Status'].map(h => (
-                    <th key={h} className="px-4 py-2 text-left text-xs font-medium text-gray-500">{h}</th>
+                    <th key={h} className="px-4 py-2 text-left text-xs font-medium" style={{ color: '#4B5563' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {results.map((r, i) => (
-                  <tr key={i} className="border-b border-gray-100 last:border-0">
-                    <td className="px-4 py-2 font-medium text-gray-800">{r.project}</td>
-                    <td className="px-4 py-2 text-gray-600">{r.brand}</td>
-                    <td className="px-4 py-2 text-gray-600">{r.submission_wk}</td>
-                    <td className="px-4 py-2 text-xs text-gray-500">
-                      {r.project_id || <span className="text-yellow-600">unmapped</span>}
+                  <tr key={i} style={{ borderBottom: '1px solid #F4F2EE' }}>
+                    <td className="px-4 py-2 font-medium" style={{ color: '#1F2937' }}>{r.project}</td>
+                    <td className="px-4 py-2" style={{ color: '#4B5563' }}>{r.brand}</td>
+                    <td className="px-4 py-2" style={{ color: '#4B5563' }}>{r.submission_wk}</td>
+                    <td className="px-4 py-2 text-xs" style={{ color: '#4B5563' }}>
+                      {r.project_id || <span style={{ color: '#E8A33D' }}>unmapped</span>}
                     </td>
                     <td className="px-4 py-2">
                       {r.synced
-                        ? <span className="text-green-600 font-medium">✓ Synced</span>
-                        : <span className="text-red-600 font-medium">✗ {r.error}</span>}
+                        ? <span className="font-medium" style={{ color: '#2F9E68' }}>&#10003; Synced</span>
+                        : <span className="font-medium" style={{ color: '#C5453F' }}>&#10007; {r.error}</span>}
                     </td>
                   </tr>
                 ))}
