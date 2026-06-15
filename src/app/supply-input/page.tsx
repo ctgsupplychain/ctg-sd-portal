@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Search, RefreshCw, Check, X } from 'lucide-react'
@@ -35,6 +35,76 @@ interface PurchaseOrder {
 type EditingCell = { id: number; field: string } | null
 
 const STATUS_OPTIONS = ['Open', 'Received', 'Cancelled', 'Closed']
+
+function EditableCell({
+  id, field, value, align = 'right', display, inputType = 'text', inputMode, selectOptions,
+  editingCell, editValue, setEditValue, saveError, startEdit, commitEdit, cancelEdit, handleKeyDown, inputRef,
+}: {
+  id: number
+  field: string
+  value: string | number | null
+  align?: 'left' | 'right'
+  display: React.ReactNode
+  inputType?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
+  selectOptions?: string[]
+  editingCell: EditingCell
+  editValue: string
+  setEditValue: (v: string) => void
+  saveError: { id: number; msg: string } | null
+  startEdit: (id: number, field: string, value: string | number | null) => void
+  commitEdit: () => void
+  cancelEdit: () => void
+  handleKeyDown: (e: React.KeyboardEvent) => void
+  inputRef: React.RefObject<HTMLInputElement | HTMLSelectElement>
+}) {
+  const isEditing = editingCell?.id === id && editingCell?.field === field
+  const hasError = saveError?.id === id
+
+  if (isEditing) {
+    return (
+      <td className="px-2 py-1.5">
+        <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+          {selectOptions ? (
+            <select
+              ref={inputRef as React.RefObject<HTMLSelectElement>}
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+            >
+              {selectOptions.map(o => <option key={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input
+              ref={inputRef as React.RefObject<HTMLInputElement>}
+              type={inputType}
+              inputMode={inputMode}
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-24 text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
+            />
+          )}
+          <button onClick={commitEdit} className="text-[#0E5C56] hover:text-[#0E5C56]"><Check size={12} /></button>
+          <button onClick={cancelEdit} className="text-[#4B5563] hover:text-[#4B5563]"><X size={12} /></button>
+        </div>
+      </td>
+    )
+  }
+
+  return (
+    <td
+      className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-[#FAEAEA]' : 'hover:bg-[#DCEAE8]'}`}
+      onClick={() => startEdit(id, field, value)}
+      title="Click to edit"
+    >
+      <span className="group-hover:underline group-hover:decoration-dashed group-hover:decoration-teal-400 group-hover:underline-offset-2">
+        {display}
+      </span>
+    </td>
+  )
+}
 
 export default function SupplyInputPage() {
   const supabase = createBrowserClient(
@@ -211,64 +281,8 @@ export default function SupplyInputPage() {
     return p.status === 'Open' && !!p.delivery_date && p.delivery_date < today && (p.balance_qty ?? p.qty) > 0
   }
 
-  // Editable cell renderer
-  function EditableCell({
-    id, field, value, align = 'right', display, inputType = 'text', selectOptions,
-  }: {
-    id: number
-    field: string
-    value: string | number | null
-    align?: 'left' | 'right'
-    display: React.ReactNode
-    inputType?: string
-    selectOptions?: string[]
-  }) {
-    const isEditing = editingCell?.id === id && editingCell?.field === field
-    const hasError = saveError?.id === id
-
-    if (isEditing) {
-      return (
-        <td className="px-2 py-1.5">
-          <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
-            {selectOptions ? (
-              <select
-                ref={inputRef as React.RefObject<HTMLSelectElement>}
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
-              >
-                {selectOptions.map(o => <option key={o}>{o}</option>)}
-              </select>
-            ) : (
-              <input
-                ref={inputRef as React.RefObject<HTMLInputElement>}
-                type={inputType}
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-24 text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
-              />
-            )}
-            <button onClick={commitEdit} className="text-[#0E5C56] hover:text-[#0E5C56]"><Check size={12} /></button>
-            <button onClick={cancelEdit} className="text-[#4B5563] hover:text-[#4B5563]"><X size={12} /></button>
-          </div>
-        </td>
-      )
-    }
-
-    return (
-      <td
-        className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-[#FAEAEA]' : 'hover:bg-[#DCEAE8]'}`}
-        onClick={() => startEdit(id, field, value)}
-        title="Click to edit"
-      >
-        <span className="group-hover:underline group-hover:decoration-dashed group-hover:decoration-teal-400 group-hover:underline-offset-2">
-          {display}
-        </span>
-      </td>
-    )
-  }
+  // EditableCell is defined outside this component to prevent remount on every render
+  const cellProps = { editingCell, editValue, setEditValue, saveError, startEdit, commitEdit, cancelEdit, handleKeyDown, inputRef }
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -449,17 +463,20 @@ export default function SupplyInputPage() {
                       </td>
                       {/* Supplier — editable */}
                       <EditableCell
+                        {...cellProps}
                         id={p.id} field="supplier_name" value={p.supplier_name} align="left"
                         display={<span className="text-xs text-[#4B5563]">{p.supplier_name || '—'}</span>}
                       />
                       {/* Qty — editable */}
                       <EditableCell
-                        id={p.id} field="qty" value={p.qty} inputType="number"
+                        {...cellProps}
+                        id={p.id} field="qty" value={p.qty} inputType="text" inputMode="numeric"
                         display={<span className="text-xs text-[#1F2937]">{p.qty?.toLocaleString()}</span>}
                       />
                       {/* Qty Shipped — editable */}
                       <EditableCell
-                        id={p.id} field="qty_shipped" value={p.qty_shipped} inputType="number"
+                        {...cellProps}
+                        id={p.id} field="qty_shipped" value={p.qty_shipped} inputType="text" inputMode="numeric"
                         display={<span className="text-xs text-[#4B5563]">{(p.qty_shipped ?? 0).toLocaleString()}</span>}
                       />
                       {/* Balance — read only (server computed) */}
@@ -470,11 +487,13 @@ export default function SupplyInputPage() {
                       </td>
                       {/* Unit price — editable */}
                       <EditableCell
-                        id={p.id} field="unit_price" value={p.unit_price} inputType="number"
+                        {...cellProps}
+                        id={p.id} field="unit_price" value={p.unit_price} inputType="text" inputMode="decimal"
                         display={<span className="font-mono text-xs text-[#1F2937]">{Number(p.unit_price ?? 0).toFixed(2)}</span>}
                       />
                       {/* Delivery date — editable */}
                       <EditableCell
+                        {...cellProps}
                         id={p.id} field="delivery_date" value={p.delivery_date} inputType="date"
                         display={
                           p.delivery_date
@@ -488,32 +507,9 @@ export default function SupplyInputPage() {
                       </td>
                       {/* Status — editable */}
                       <EditableCell
+                        {...cellProps}
                         id={p.id} field="status" value={p.status}
                         selectOptions={STATUS_OPTIONS}
                         display={
                           <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                            p.status === 'Open' ? 'bg-[#FEF3E2] text-[#E8A33D]'
-                            : p.status === 'Received' ? 'bg-[#DCEAE8] text-[#0E5C56]'
-                            : 'bg-[#E4DDD3] text-[#4B5563]'
-                          }`}>{p.status}</span>
-                        }
-                      />
-                    </tr>
-                  )
-                })}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-[#4B5563]">No POs match your filters</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <p className="text-[11px] text-[#4B5563] mt-3">
-          Click Supplier, Qty, Shipped, Unit Price, Delivery Date, or Status to edit inline · Enter to save · Esc to cancel ·
-          Balance and Receipt Week are recalculated automatically · Bulk changes via Upload above
-        </p>
-      </div>
-    </div>
-  )
-}
+         
