@@ -221,6 +221,7 @@ export default function SupplyInputPage() {
     align?: 'left' | 'right'
     display: React.ReactNode
     inputType?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
     selectOptions?: string[]
   }) {
     const isEditing = editingCell?.id === id && editingCell?.field === field
