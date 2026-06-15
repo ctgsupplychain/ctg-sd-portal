@@ -17,8 +17,7 @@ interface UploadResult {
 interface PurchaseOrder {
   id: number
   po_number: string
-  sku: string | null
-  part_number: string | null
+  sku: string
   brand: string | null
   supplier_name: string | null
   qty: number
@@ -75,7 +74,7 @@ export default function SupplyInputPage() {
     setListLoading(true); setListError(null)
     const { data, error: err } = await supabase
       .from('purchase_orders')
-      .select('id, po_number, sku, part_number, brand, supplier_name, qty, qty_shipped, balance_qty, unit_price, delivery_date, receipt_wk, status, commit_status, notes, updated_at')
+      .select('id, po_number, sku, brand, supplier_name, qty, qty_shipped, balance_qty, unit_price, delivery_date, receipt_wk, status, commit_status, notes, updated_at')
       .order('updated_at', { ascending: false })
       .limit(1000)
     if (err) { setListError(err.message); setListLoading(false); return }
@@ -196,7 +195,7 @@ export default function SupplyInputPage() {
   const filtered = useMemo(() => pos.filter(p => {
     const q = search.toLowerCase()
     return (
-      (!search || p.po_number.toLowerCase().includes(q) || (p.sku ?? '').toLowerCase().includes(q) || (p.part_number ?? '').toLowerCase().includes(q) || (p.supplier_name ?? '').toLowerCase().includes(q)) &&
+      (!search || p.po_number.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.supplier_name ?? '').toLowerCase().includes(q)) &&
       (statusFilter === 'All' || p.status === statusFilter)
     )
   }), [pos, search, statusFilter])
@@ -237,7 +236,7 @@ export default function SupplyInputPage() {
                 value={editValue}
                 onChange={e => setEditValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="text-xs border border-teal-400 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+                className="text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
               >
                 {selectOptions.map(o => <option key={o}>{o}</option>)}
               </select>
@@ -248,11 +247,11 @@ export default function SupplyInputPage() {
                 value={editValue}
                 onChange={e => setEditValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-24 text-xs border border-teal-400 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
+                className="w-24 text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
               />
             )}
-            <button onClick={commitEdit} className="text-teal-600 hover:text-teal-700"><Check size={12} /></button>
-            <button onClick={cancelEdit} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
+            <button onClick={commitEdit} className="text-[#0E5C56] hover:text-[#0E5C56]"><Check size={12} /></button>
+            <button onClick={cancelEdit} className="text-[#4B5563] hover:text-[#4B5563]"><X size={12} /></button>
           </div>
         </td>
       )
@@ -260,7 +259,7 @@ export default function SupplyInputPage() {
 
     return (
       <td
-        className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-red-50' : 'hover:bg-teal-50'}`}
+        className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-[#FAEAEA]' : 'hover:bg-[#DCEAE8]'}`}
         onClick={() => startEdit(id, field, value)}
         title="Click to edit"
       >
@@ -275,30 +274,30 @@ export default function SupplyInputPage() {
     <div className="max-w-6xl mx-auto px-6 py-10">
       <div className="flex items-center gap-3 mb-6">
         <BackToSD />
-        <div className="w-px h-4 bg-gray-200" />
-        <h1 className="text-sm font-semibold text-gray-900">Supply Input — Open POs</h1>
+        <div className="w-px h-4 bg-[#E4DDD3]" />
+        <h1 className="text-sm font-semibold text-[#1F2937]">Supply Input — Open POs</h1>
       </div>
-      <p className="text-sm text-gray-500 mb-8">
+      <p className="text-sm text-[#4B5563] mb-8">
         Upload the weekly Open PO file (.xlsx). Records are upserted by PO Number + SKU. Missing POs are kept as-is.
         Click any cell below to edit a record directly.
       </p>
 
       {/* Upload section */}
-      <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+      <div className="bg-[#DCEAE8] border border-[#DCEAE8] rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-teal-800">Need the template?</p>
-          <p className="text-xs text-teal-600 mt-0.5">Download and fill in the CTG PO Upload Template</p>
+          <p className="text-sm font-medium text-[#0E5C56]">Need the template?</p>
+          <p className="text-xs text-[#0E5C56] mt-0.5">Download and fill in the CTG PO Upload Template</p>
         </div>
         <a
           href="/templates/CTG_PO_Upload_Template.xlsx"
-          className="text-xs font-medium text-teal-700 border border-teal-300 px-3 py-1.5 rounded-lg hover:bg-teal-100 transition-colors flex items-center gap-1.5"
+          className="text-xs font-medium text-[#0E5C56] border border-[#0E5C56] px-3 py-1.5 rounded-lg hover:bg-[#DCEAE8] transition-colors flex items-center gap-1.5"
         >
           <FileSpreadsheet size={13} /> Download Template
         </a>
       </div>
 
       {lastUploaded && (
-        <p className="text-xs text-gray-400 mb-3">Last uploaded: {lastUploaded}</p>
+        <p className="text-xs text-[#4B5563] mb-3">Last uploaded: {lastUploaded}</p>
       )}
 
       <div
@@ -307,21 +306,21 @@ export default function SupplyInputPage() {
         onDrop={handleDrop}
         onClick={() => document.getElementById('po-file-input')?.click()}
         className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
-          dragging ? 'border-teal-500 bg-teal-50' : 'border-gray-300 bg-gray-50 hover:border-teal-400'
+          dragging ? 'border-[#0E5C56] bg-[#DCEAE8]' : 'border-[#E4DDD3] bg-[#F4F2EE] hover:border-[#0E5C56]'
         }`}
       >
         <input id="po-file-input" type="file" accept=".xlsx" className="hidden" onChange={handleFileChange} />
         {file ? (
           <div>
-            <FileSpreadsheet size={22} className="mx-auto mb-2 text-teal-600" />
-            <p className="text-sm font-medium text-teal-700">{file.name}</p>
-            <p className="text-xs text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB</p>
+            <FileSpreadsheet size={22} className="mx-auto mb-2 text-[#0E5C56]" />
+            <p className="text-sm font-medium text-[#0E5C56]">{file.name}</p>
+            <p className="text-xs text-[#4B5563] mt-1">{(file.size / 1024).toFixed(1)} KB</p>
           </div>
         ) : (
           <div>
-            <Upload size={22} className="mx-auto mb-2 text-gray-400" />
-            <p className="text-sm text-gray-500">Drag & drop your PO .xlsx file here</p>
-            <p className="text-xs text-gray-400 mt-1">or click to browse</p>
+            <Upload size={22} className="mx-auto mb-2 text-[#4B5563]" />
+            <p className="text-sm text-[#4B5563]">Drag & drop your PO .xlsx file here</p>
+            <p className="text-xs text-[#4B5563] mt-1">or click to browse</p>
           </div>
         )}
       </div>
@@ -329,25 +328,25 @@ export default function SupplyInputPage() {
       <button
         onClick={handleUpload}
         disabled={!file || loading}
-        className="mt-4 w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+        className="mt-4 w-full bg-[#0E5C56] hover:bg-[#0A4A45] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
       >
         {loading ? 'Uploading...' : 'Upload & Save'}
       </button>
 
       {error && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex gap-2">
-          <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="mt-4 bg-[#FAEAEA] border border-[#F5C6C4] rounded-lg px-4 py-3 flex gap-2">
+          <AlertCircle size={16} className="text-[#C5453F] flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-[#C5453F]">{error}</p>
         </div>
       )}
 
       {result && (
-        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-4 space-y-2">
+        <div className="mt-4 bg-[#DCEAE8] border border-[#DCEAE8] rounded-lg px-4 py-4 space-y-2">
           <div className="flex items-center gap-2">
-            <CheckCircle size={16} className="text-green-600" />
-            <p className="text-sm font-medium text-green-800">Upload successful</p>
+            <CheckCircle size={16} className="text-[#2F9E68]" />
+            <p className="text-sm font-medium text-[#0E5C56]">Upload successful</p>
           </div>
-          <div className="text-sm text-green-700 space-y-1">
+          <div className="text-sm text-[#0E5C56] space-y-1">
             <p>Total rows in file: <span className="font-medium">{result.total_rows}</span></p>
             <p>Records upserted: <span className="font-medium">{result.upserted}</span></p>
             {result.skipped > 0 && (
@@ -355,9 +354,9 @@ export default function SupplyInputPage() {
             )}
           </div>
           {result.invalid_skus?.length > 0 && (
-            <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">
+            <div className="mt-2 bg-[#FEF3E2] border border-[#F9DEB8] rounded-md px-3 py-2">
               <p className="text-xs font-medium text-yellow-800 mb-1">Unrecognized SKUs (not saved):</p>
-              <ul className="text-xs text-yellow-700 space-y-0.5">
+              <ul className="text-xs text-[#E8A33D] space-y-0.5">
                 {result.invalid_skus.map(sku => <li key={sku}>• {sku}</li>)}
               </ul>
             </div>
@@ -368,10 +367,10 @@ export default function SupplyInputPage() {
       {/* ───────────── PO List ───────────── */}
       <div className="mt-10">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <h2 className="text-sm font-semibold text-gray-900">Current Open POs</h2>
+          <h2 className="text-sm font-semibold text-[#1F2937]">Current Open POs</h2>
           <button
             onClick={loadPos}
-            className="inline-flex items-center gap-1.5 text-xs text-gray-500 px-3 py-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-[#4B5563] px-3 py-1.5 border border-[#E4DDD3] rounded-lg bg-white hover:bg-[#F4F2EE] transition-colors"
           >
             <RefreshCw size={12} /> Refresh
           </button>
@@ -384,16 +383,16 @@ export default function SupplyInputPage() {
             { label: 'Open', value: openCount, sub: 'awaiting receipt' },
             { label: 'Delayed', value: delayedCount, sub: 'past delivery date, not yet received' },
           ].map(m => (
-            <div key={m.label} className="bg-gray-50 rounded-lg px-4 py-3">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">{m.label}</p>
-              <p className={`text-xl font-semibold ${m.label === 'Delayed' && m.value > 0 ? 'text-red-600' : 'text-gray-900'}`}>{m.value}</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">{m.sub}</p>
+            <div key={m.label} className="bg-[#F4F2EE] rounded-lg px-4 py-3">
+              <p className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wide mb-1">{m.label}</p>
+              <p className={`text-xl font-semibold ${m.label === 'Delayed' && m.value > 0 ? 'text-[#C5453F]' : 'text-[#1F2937]'}`}>{m.value}</p>
+              <p className="text-[11px] text-[#4B5563] mt-0.5">{m.sub}</p>
             </div>
           ))}
         </div>
 
         {saveError && (
-          <div className="flex items-center justify-between mb-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
+          <div className="flex items-center justify-between mb-3 px-4 py-2.5 bg-[#FAEAEA] border border-[#F5C6C4] rounded-lg text-xs text-[#C5453F]">
             <span>Failed to save PO #{saveError.id}: {saveError.msg}</span>
             <button onClick={() => setSaveError(null)}><X size={12} /></button>
           </div>
@@ -402,32 +401,32 @@ export default function SupplyInputPage() {
         {/* Filter bar */}
         <div className="flex items-center gap-2 mb-3">
           <div className="relative flex-1">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#4B5563] pointer-events-none" />
             <input
               type="text"
               placeholder="Search PO number, SKU, or supplier..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-teal-400"
+              className="w-full pl-7 pr-3 py-1.5 text-xs border border-[#E4DDD3] rounded-lg bg-white focus:outline-none focus:border-[#0E5C56]"
             />
           </div>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-gray-600 focus:outline-none focus:border-teal-400">
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-xs px-2 py-1.5 border border-[#E4DDD3] rounded-lg bg-white text-[#4B5563] focus:outline-none focus:border-[#0E5C56]">
             {statuses.map(s => <option key={s}>{s}</option>)}
           </select>
-          <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} POs</span>
+          <span className="text-xs text-[#4B5563] whitespace-nowrap">{filtered.length} POs</span>
         </div>
 
         {listError ? (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{listError}</div>
+          <div className="text-sm text-[#C5453F] bg-[#FAEAEA] border border-[#F5C6C4] rounded-lg px-4 py-3">{listError}</div>
         ) : listLoading ? (
-          <div className="text-sm text-gray-400 text-center py-16">Loading...</div>
+          <div className="text-sm text-[#4B5563] text-center py-16">Loading...</div>
         ) : (
-          <div className="border border-gray-200 rounded-xl overflow-x-auto">
+          <div className="border border-[#E4DDD3] rounded-xl overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  {['PO Number', 'SKU / Part No', 'Supplier', 'Qty', 'Shipped', 'Balance', 'Unit Price', 'Delivery Date', 'Receipt Wk', 'Status'].map((h, i) => (
-                    <th key={h} className={`px-3 py-2.5 font-medium text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap ${i < 3 ? 'text-left' : 'text-right'}`}>{h}</th>
+                <tr className="bg-[#F4F2EE] border-b border-[#E4DDD3]">
+                  {['PO Number', 'SKU', 'Supplier', 'Qty', 'Shipped', 'Balance', 'Unit Price', 'Delivery Date', 'Receipt Wk', 'Status'].map((h, i) => (
+                    <th key={h} className={`px-3 py-2.5 font-medium text-[#4B5563] uppercase tracking-wide text-[10px] whitespace-nowrap ${i < 3 ? 'text-left' : 'text-right'}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -435,60 +434,57 @@ export default function SupplyInputPage() {
                 {filtered.map(p => {
                   const delayed = isDelayed(p)
                   return (
-                    <tr key={p.id} className={`border-b border-gray-100 last:border-0 transition-colors ${delayed ? 'bg-red-50/40' : ''}`}>
+                    <tr key={p.id} className={`border-b border-[#E4DDD3] last:border-0 transition-colors ${delayed ? 'bg-[#FAEAEA]/40' : ''}`}>
                       {/* PO Number — read only */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-[11px] text-gray-700">{p.po_number}</span>
+                        <span className="font-mono text-[11px] text-[#1F2937]">{p.po_number}</span>
                         {delayed && (
-                          <span className="ml-2 inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 align-middle">Delayed</span>
+                          <span className="ml-2 inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#FAEAEA] text-[#C5453F] align-middle">Delayed</span>
                         )}
                       </td>
-                      {/* SKU / Part Number — read only */}
+                      {/* SKU — read only */}
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-[11px] text-gray-700">{p.sku ?? p.part_number ?? '—'}</span>
-                        {p.part_number && !p.sku && (
-                          <span className="ml-1.5 inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 align-middle">Component</span>
-                        )}
-                        {p.brand && <p className="text-[10px] text-gray-400 mt-0.5">{p.brand}</p>}
+                        <span className="font-mono text-[11px] text-[#1F2937]">{p.sku}</span>
+                        {p.brand && <p className="text-[10px] text-[#4B5563] mt-0.5">{p.brand}</p>}
                       </td>
                       {/* Supplier — editable */}
                       <EditableCell
                         id={p.id} field="supplier_name" value={p.supplier_name} align="left"
-                        display={<span className="text-xs text-gray-600">{p.supplier_name || '—'}</span>}
+                        display={<span className="text-xs text-[#4B5563]">{p.supplier_name || '—'}</span>}
                       />
                       {/* Qty — editable */}
                       <EditableCell
                         id={p.id} field="qty" value={p.qty} inputType="number"
-                        display={<span className="text-xs text-gray-700">{p.qty?.toLocaleString()}</span>}
+                        display={<span className="text-xs text-[#1F2937]">{p.qty?.toLocaleString()}</span>}
                       />
                       {/* Qty Shipped — editable */}
                       <EditableCell
                         id={p.id} field="qty_shipped" value={p.qty_shipped} inputType="number"
-                        display={<span className="text-xs text-gray-600">{(p.qty_shipped ?? 0).toLocaleString()}</span>}
+                        display={<span className="text-xs text-[#4B5563]">{(p.qty_shipped ?? 0).toLocaleString()}</span>}
                       />
                       {/* Balance — read only (server computed) */}
                       <td className="px-3 py-2.5 text-right">
-                        <span className={`text-xs font-medium ${(p.balance_qty ?? 0) > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                        <span className={`text-xs font-medium ${(p.balance_qty ?? 0) > 0 ? 'text-amber-600' : 'text-[#4B5563]'}`}>
                           {(p.balance_qty ?? p.qty)?.toLocaleString()}
                         </span>
                       </td>
                       {/* Unit price — editable */}
                       <EditableCell
                         id={p.id} field="unit_price" value={p.unit_price} inputType="number"
-                        display={<span className="font-mono text-xs text-gray-700">{Number(p.unit_price ?? 0).toFixed(2)}</span>}
+                        display={<span className="font-mono text-xs text-[#1F2937]">{Number(p.unit_price ?? 0).toFixed(2)}</span>}
                       />
                       {/* Delivery date — editable */}
                       <EditableCell
                         id={p.id} field="delivery_date" value={p.delivery_date} inputType="date"
                         display={
                           p.delivery_date
-                            ? <span className={`text-xs ${delayed ? 'text-red-600 font-medium' : 'text-gray-600'}`}>{p.delivery_date}</span>
-                            : <span className="text-gray-300 text-xs">—</span>
+                            ? <span className={`text-xs ${delayed ? 'text-[#C5453F] font-medium' : 'text-[#4B5563]'}`}>{p.delivery_date}</span>
+                            : <span className="text-[#4B5563] text-xs">—</span>
                         }
                       />
                       {/* Receipt week — read only (derived) */}
                       <td className="px-3 py-2.5 text-right">
-                        <span className="text-xs text-gray-500">{p.receipt_wk || '—'}</span>
+                        <span className="text-xs text-[#4B5563]">{p.receipt_wk || '—'}</span>
                       </td>
                       {/* Status — editable */}
                       <EditableCell
@@ -496,9 +492,9 @@ export default function SupplyInputPage() {
                         selectOptions={STATUS_OPTIONS}
                         display={
                           <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                            p.status === 'Open' ? 'bg-amber-50 text-amber-700'
-                            : p.status === 'Received' ? 'bg-green-50 text-green-700'
-                            : 'bg-gray-100 text-gray-400'
+                            p.status === 'Open' ? 'bg-[#FEF3E2] text-[#E8A33D]'
+                            : p.status === 'Received' ? 'bg-[#DCEAE8] text-[#0E5C56]'
+                            : 'bg-[#E4DDD3] text-[#4B5563]'
                           }`}>{p.status}</span>
                         }
                       />
@@ -506,14 +502,14 @@ export default function SupplyInputPage() {
                   )
                 })}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-gray-400">No POs match your filters</td></tr>
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-[#4B5563]">No POs match your filters</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )}
 
-        <p className="text-[11px] text-gray-400 mt-3">
+        <p className="text-[11px] text-[#4B5563] mt-3">
           Click Supplier, Qty, Shipped, Unit Price, Delivery Date, or Status to edit inline · Enter to save · Esc to cancel ·
           Balance and Receipt Week are recalculated automatically · Bulk changes via Upload above
         </p>

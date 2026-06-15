@@ -36,10 +36,10 @@ const EDITABLE_FIELDS: Record<string, { label: string; type: 'number' | 'text' }
 
 const CAT_COLORS: Record<string, string> = {
   RM:  'bg-orange-50 text-orange-700 border-orange-200',
-  PK:  'bg-blue-50 text-blue-700 border-blue-200',
+  PK:  'bg-[#DCEAE8] text-[#0E5C56] border-[#DCEAE8]',
   SA:  'bg-purple-50 text-purple-700 border-purple-200',
-  WIP: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  FG:  'bg-green-50 text-green-700 border-green-200',
+  WIP: 'bg-[#FEF3E2] text-[#E8A33D] border-[#F9DEB8]',
+  FG:  'bg-[#DCEAE8] text-[#0E5C56] border-[#DCEAE8]',
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
@@ -324,7 +324,7 @@ export default function PartMasterPage() {
             onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') cancelEdit() }}
             className="w-20 text-xs border border-[#6941C6] rounded px-1.5 py-0.5 text-center outline-none focus:ring-1 focus:ring-[#6941C6]"
           />
-          <button onClick={commitEdit} className="text-green-600 hover:text-green-700"><Check size={12} /></button>
+          <button onClick={commitEdit} className="text-[#2F9E68] hover:text-[#0E5C56]"><Check size={12} /></button>
           <button onClick={cancelEdit} className="text-[#98A2B3] hover:text-[#667085]"><X size={12} /></button>
         </div>
       )
@@ -381,7 +381,7 @@ export default function PartMasterPage() {
 
         {/* Upload feedback */}
         {uploadMsg && (
-          <div className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5">
+          <div className="mb-4 text-sm text-[#0E5C56] bg-[#DCEAE8] border border-[#DCEAE8] rounded-lg px-4 py-2.5">
             {uploadMsg}
           </div>
         )}
@@ -414,7 +414,7 @@ export default function PartMasterPage() {
           <span className="text-xs text-[#98A2B3] ml-auto">{filtered.length} parts</span>
         </div>
 
-        {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+        {error && <p className="text-sm text-[#C5453F] mb-4">{error}</p>}
 
         {/* Table */}
         <div className="bg-white rounded-xl border border-[#EAECF0] overflow-hidden">
@@ -435,7 +435,7 @@ export default function PartMasterPage() {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-[#98A2B3]">No parts found.</td></tr>
                 ) : filtered.map((p, idx) => {
-                  const catStyle = CAT_COLORS[p.category] || 'bg-gray-50 text-gray-600 border-gray-200'
+                  const catStyle = CAT_COLORS[p.category] || 'bg-[#F4F2EE] text-[#4B5563] border-[#E4DDD3]'
                   const hasSaveError = saveError?.pn === p.part_number
                   return (
                     <>
@@ -476,8 +476,8 @@ export default function PartMasterPage() {
                         </td>
                       </tr>
                       {hasSaveError && (
-                        <tr key={`err-${p.part_number}`} className="bg-red-50">
-                          <td colSpan={10} className="px-4 py-1.5 text-xs text-red-600">{saveError!.msg}</td>
+                        <tr key={`err-${p.part_number}`} className="bg-[#FAEAEA]">
+                          <td colSpan={10} className="px-4 py-1.5 text-xs text-[#C5453F]">{saveError!.msg}</td>
                         </tr>
                       )}
                     </>

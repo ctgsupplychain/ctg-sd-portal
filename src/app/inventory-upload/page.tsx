@@ -112,24 +112,24 @@ export default function InventoryUploadPage() {
     <div className="max-w-2xl mx-auto px-6 py-10">
       <div className="flex items-center gap-3 mb-6">
         <BackToSD />
-        <div className="w-px h-4 bg-gray-200" />
-        <h1 className="text-sm font-semibold text-gray-900">WMS Inventory Upload</h1>
+        <div className="w-px h-4 bg-[#E4DDD3]" />
+        <h1 className="text-sm font-semibold text-[#1F2937]">WMS Inventory Upload</h1>
       </div>
-      <p className="text-sm text-gray-500 mb-8">
+      <p className="text-sm text-[#4B5563] mb-8">
         Upload the daily WMS inventory report (.xlsx). Data will be saved to the inventory snapshot database.
       </p>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-[#1F2937] mb-1">
           Snapshot Date
         </label>
         <input
           type="date"
           value={snapshotDate}
           onChange={e => setSnapshotDate(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className="border border-[#E4DDD3] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E5C56]"
         />
-        <p className="text-xs text-gray-400 mt-1">Defaults to today. Adjust if uploading a backdated report.</p>
+        <p className="text-xs text-[#4B5563] mt-1">Defaults to today. Adjust if uploading a backdated report.</p>
       </div>
 
       <div
@@ -137,7 +137,7 @@ export default function InventoryUploadPage() {
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
-          dragging ? 'border-teal-500 bg-teal-50' : 'border-gray-300 bg-gray-50 hover:border-teal-400'
+          dragging ? 'border-[#0E5C56] bg-[#DCEAE8]' : 'border-[#E4DDD3] bg-[#F4F2EE] hover:border-[#0E5C56]'
         }`}
         onClick={() => document.getElementById('file-input')?.click()}
       >
@@ -150,13 +150,13 @@ export default function InventoryUploadPage() {
         />
         {file ? (
           <div>
-            <p className="text-sm font-medium text-teal-700">{file.name}</p>
-            <p className="text-xs text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB</p>
+            <p className="text-sm font-medium text-[#0E5C56]">{file.name}</p>
+            <p className="text-xs text-[#4B5563] mt-1">{(file.size / 1024).toFixed(1)} KB</p>
           </div>
         ) : (
           <div>
-            <p className="text-sm text-gray-500">Drag &amp; drop your WMS .xlsx file here</p>
-            <p className="text-xs text-gray-400 mt-1">or click to browse</p>
+            <p className="text-sm text-[#4B5563]">Drag &amp; drop your WMS .xlsx file here</p>
+            <p className="text-xs text-[#4B5563] mt-1">or click to browse</p>
           </div>
         )}
       </div>
@@ -164,21 +164,21 @@ export default function InventoryUploadPage() {
       <button
         onClick={handleUpload}
         disabled={!file || !snapshotDate || loading}
-        className="mt-6 w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+        className="mt-6 w-full bg-[#0E5C56] hover:bg-[#0A4A45] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
       >
         {loading ? 'Parsing & uploading...' : 'Upload & Save'}
       </button>
 
       {error && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="mt-4 bg-[#FAEAEA] border border-[#F5C6C4] rounded-lg px-4 py-3">
+          <p className="text-sm text-[#C5453F]">{error}</p>
         </div>
       )}
 
       {result && (
-        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-4 space-y-2">
-          <p className="text-sm font-medium text-green-800">Upload successful</p>
-          <div className="text-sm text-green-700 space-y-1">
+        <div className="mt-4 bg-[#DCEAE8] border border-[#DCEAE8] rounded-lg px-4 py-4 space-y-2">
+          <p className="text-sm font-medium text-[#0E5C56]">Upload successful</p>
+          <div className="text-sm text-[#0E5C56] space-y-1">
             <p>Total rows in file: <span className="font-medium">{result.total_rows}</span></p>
             <p>Records upserted: <span className="font-medium">{result.upserted}</span></p>
             {result.duplicates_removed > 0 && (
@@ -186,9 +186,9 @@ export default function InventoryUploadPage() {
             )}
           </div>
           {result.missing_skindae_skus.length > 0 && (
-            <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">
+            <div className="mt-3 bg-[#FEF3E2] border border-[#F9DEB8] rounded-md px-3 py-2">
               <p className="text-xs font-medium text-yellow-800 mb-1">SkinDae SKUs not found in this report:</p>
-              <ul className="text-xs text-yellow-700 space-y-0.5">
+              <ul className="text-xs text-[#E8A33D] space-y-0.5">
                 {result.missing_skindae_skus.map(sku => (
                   <li key={sku}>• {sku}</li>
                 ))}

@@ -39,8 +39,8 @@ const MODEL_LABELS: Record<string, string> = {
   holt_winters: "Holt's Linear", wma: 'SES',
 }
 const MODEL_COLORS: Record<string, string> = {
-  holts_linear: 'bg-teal-100 text-teal-800', ses: 'bg-blue-100 text-blue-800', avg: 'bg-gray-100 text-gray-600',
-  holt_winters: 'bg-teal-100 text-teal-800', wma: 'bg-blue-100 text-blue-800',
+  holts_linear: 'bg-[#DCEAE8] text-[#0E5C56]', ses: 'bg-[#DCEAE8] text-[#0E5C56]', avg: 'bg-[#E4DDD3] text-[#4B5563]',
+  holt_winters: 'bg-[#DCEAE8] text-[#0E5C56]', wma: 'bg-[#DCEAE8] text-[#0E5C56]',
 }
 
 export default function SalesHistoryUploadPage() {
@@ -221,28 +221,28 @@ export default function SalesHistoryUploadPage() {
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${channel === 'B2B' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{channel}</span>
-        <span className="text-sm text-gray-600 font-medium">{channel === 'B2B' ? 'B2B Order Report' : 'B2C Order Report'}</span>
-        <span className="text-xs text-gray-400 ml-auto">Optional</span>
+        <span className="text-sm text-[#4B5563] font-medium">{channel === 'B2B' ? 'B2B Order Report' : 'B2C Order Report'}</span>
+        <span className="text-xs text-[#4B5563] ml-auto">Optional</span>
       </div>
       <div
         onDragOver={e => { e.preventDefault(); onDrag() }} onDragLeave={onDragLeave} onDrop={onDrop}
         onClick={() => document.getElementById(`file-${channel}`)?.click()}
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-          dragging ? 'border-teal-500 bg-teal-50' : file ? 'border-teal-400 bg-teal-50/40' : 'border-gray-200 bg-gray-50 hover:border-teal-300'
+          dragging ? 'border-[#0E5C56] bg-[#DCEAE8]' : file ? 'border-[#0E5C56] bg-[#DCEAE8]/40' : 'border-[#E4DDD3] bg-[#F4F2EE] hover:border-[#0E5C56]'
         }`}
       >
         <input id={`file-${channel}`} type="file" accept=".xls,.xlsx" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) { onChange(f); setResults([]); setError(null) } }} />
         {file ? (
           <div className="flex items-center justify-center gap-2">
-            <CheckCircle size={16} className="text-teal-600" />
-            <div><p className="text-sm font-medium text-teal-700">{file.name}</p><p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB</p></div>
+            <CheckCircle size={16} className="text-[#0E5C56]" />
+            <div><p className="text-sm font-medium text-[#0E5C56]">{file.name}</p><p className="text-xs text-[#4B5563]">{(file.size / 1024).toFixed(1)} KB</p></div>
           </div>
         ) : (
           <div>
-            <Upload size={18} className="text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-400">Drop {channel} report here, or click to browse</p>
-            <p className="text-xs text-gray-300 mt-0.5">.xls or .xlsx</p>
+            <Upload size={18} className="text-[#4B5563] mx-auto mb-2" />
+            <p className="text-sm text-[#4B5563]">Drop {channel} report here, or click to browse</p>
+            <p className="text-xs text-[#4B5563] mt-0.5">.xls or .xlsx</p>
           </div>
         )}
       </div>
@@ -264,16 +264,16 @@ export default function SalesHistoryUploadPage() {
     <div className="max-w-2xl mx-auto px-6 py-10">
       <div className="flex items-center gap-3 mb-6">
         <BackToSD />
-        <div className="w-px h-4 bg-gray-200" />
-        <h1 className="text-sm font-semibold text-gray-900">Sales History Upload</h1>
+        <div className="w-px h-4 bg-[#E4DDD3]" />
+        <h1 className="text-sm font-semibold text-[#1F2937]">Sales History Upload</h1>
       </div>
       <div className="mb-8">
-        <p className="text-sm text-gray-500">Upload B2B and/or B2C WMS order reports. Data is rolled up to weekly demand, upserted into the sales history table, and demand forecasts are regenerated automatically.</p>
+        <p className="text-sm text-[#4B5563]">Upload B2B and/or B2C WMS order reports. Data is rolled up to weekly demand, upserted into the sales history table, and demand forecasts are regenerated automatically.</p>
       </div>
 
-      <div className="mb-6 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
-        <p className="text-xs font-medium text-blue-800 mb-1">Upload Modes</p>
-        <ul className="text-xs text-blue-700 space-y-0.5">
+      <div className="mb-6 bg-[#DCEAE8] border border-[#DCEAE8] rounded-lg px-4 py-3">
+        <p className="text-xs font-medium text-[#0E5C56] mb-1">Upload Modes</p>
+        <ul className="text-xs text-[#0E5C56] space-y-0.5">
           <li>• <strong>Bootstrap (first time per brand):</strong> Upload 12-month B2B + B2C together — brand is auto-detected from the Company column.</li>
           <li>• <strong>Ongoing:</strong> Upload combined multi-brand reports monthly. Only new weeks are inserted; existing weeks are overwritten.</li>
         </ul>
@@ -289,23 +289,23 @@ export default function SalesHistoryUploadPage() {
       </div>
 
       <button onClick={handleRegenerate} disabled={regenerating || loading}
-        className="w-full border border-teal-600 text-teal-600 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 mb-3">
+        className="w-full border border-teal-600 text-[#0E5C56] hover:bg-[#DCEAE8] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 mb-3">
         {regenerating ? <><span className="w-4 h-4 border-2 border-teal-600/30 border-t-teal-600 rounded-full animate-spin" />Regenerating...</> : <><RefreshCw size={15} />Regenerate Forecast from Existing Data</>}
       </button>
 
       <button onClick={handleUpload} disabled={(!b2bFile && !b2cFile) || loading}
-        className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+        className="w-full bg-[#0E5C56] hover:bg-[#0A4A45] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
         {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{loadingLabel}</> : <><Upload size={15} />Upload &amp; Generate Forecast</>}
       </button>
 
-      {error && <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3"><p className="text-sm text-red-700">{error}</p></div>}
+      {error && <div className="mt-4 bg-[#FAEAEA] border border-[#F5C6C4] rounded-lg px-4 py-3"><p className="text-sm text-[#C5453F]">{error}</p></div>}
 
       {results.length > 0 && (
         <div className="mt-6 space-y-4">
-          <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4">
+          <div className="bg-[#DCEAE8] border border-[#DCEAE8] rounded-xl px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle size={16} className="text-green-600" />
-              <p className="text-sm font-semibold text-green-800">Upload Complete</p>
+              <CheckCircle size={16} className="text-[#2F9E68]" />
+              <p className="text-sm font-semibold text-[#0E5C56]">Upload Complete</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Stat label="Weekly rows saved" value={totalWeeklyRows.toString()} />
@@ -314,30 +314,30 @@ export default function SalesHistoryUploadPage() {
           </div>
 
           {results.filter(r => r.salesHistory.weeklyRowsProcessed > 0).map(r => (
-            <div key={r.channel} className="border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+            <div key={r.channel} className="border border-[#E4DDD3] rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-[#F4F2EE] border-b border-[#E4DDD3] flex items-center gap-2">
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.channel === 'B2B' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{r.channel}</span>
-                <span className="text-sm font-medium text-gray-700">{r.parseStats.validLineItems.toLocaleString()} line items → {r.salesHistory.weeklyRowsProcessed} weekly rows</span>
+                <span className="text-sm font-medium text-[#1F2937]">{r.parseStats.validLineItems.toLocaleString()} line items → {r.salesHistory.weeklyRowsProcessed} weekly rows</span>
               </div>
             </div>
           ))}
 
           {Object.keys(mergedForecastSummary).length > 0 && (
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Forecast Generated</p>
+            <div className="border border-[#E4DDD3] rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-[#F4F2EE] border-b border-[#E4DDD3]">
+                <p className="text-xs font-medium text-[#4B5563] uppercase tracking-wider">Forecast Generated</p>
               </div>
               <div className="px-4 py-3 space-y-2">
                 {Object.entries(mergedForecastSummary).map(([sku, info]) => (
                   <div key={sku} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <BarChart2 size={13} className="text-gray-400" />
-                      <span className="text-sm font-mono text-gray-700">{sku}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${MODEL_COLORS[info.model] ?? 'bg-gray-100 text-gray-600'}`}>{MODEL_LABELS[info.model] ?? info.model}</span>
-                      <span className="text-xs text-gray-400">{info.historyWeeks}wk history</span>
+                      <BarChart2 size={13} className="text-[#4B5563]" />
+                      <span className="text-sm font-mono text-[#1F2937]">{sku}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${MODEL_COLORS[info.model] ?? 'bg-[#E4DDD3] text-[#4B5563]'}`}>{MODEL_LABELS[info.model] ?? info.model}</span>
+                      <span className="text-xs text-[#4B5563]">{info.historyWeeks}wk history</span>
                     </div>
                     {info.mape !== undefined && (
-                      <span className={`text-xs font-medium ${info.mape < 20 ? 'text-green-600' : info.mape < 40 ? 'text-yellow-600' : 'text-red-500'}`}>MAPE {info.mape}%</span>
+                      <span className={`text-xs font-medium ${info.mape < 20 ? 'text-[#2F9E68]' : info.mape < 40 ? 'text-[#E8A33D]' : 'text-[#C5453F]'}`}>MAPE {info.mape}%</span>
                     )}
                   </div>
                 ))}
@@ -346,22 +346,22 @@ export default function SalesHistoryUploadPage() {
           )}
 
           {allUnknownSkus.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+            <div className="bg-[#FEF3E2] border border-[#F9DEB8] rounded-lg px-4 py-3">
               <p className="text-xs font-medium text-yellow-800 mb-1">{allUnknownSkus.length} SKU{allUnknownSkus.length > 1 ? 's' : ''} not in master_sku — skipped</p>
-              <p className="text-xs text-yellow-700 font-mono">{allUnknownSkus.join(', ')}</p>
+              <p className="text-xs text-[#E8A33D] font-mono">{allUnknownSkus.join(', ')}</p>
             </div>
           )}
 
           {Object.keys(allSkippedStatuses).length > 0 && (
-            <div className="border border-gray-100 rounded-lg overflow-hidden">
-              <button onClick={() => setShowSkipped(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors">
+            <div className="border border-[#E4DDD3] rounded-lg overflow-hidden">
+              <button onClick={() => setShowSkipped(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-[#4B5563] hover:bg-[#F4F2EE] transition-colors">
                 <span>Skipped order statuses</span>
                 {showSkipped ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               </button>
               {showSkipped && (
                 <div className="px-4 pb-3 flex flex-wrap gap-2">
                   {Object.entries(allSkippedStatuses).map(([status, count]) => (
-                    <span key={status} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono">{status}: {count}</span>
+                    <span key={status} className="text-xs bg-[#E4DDD3] text-[#4B5563] px-2 py-0.5 rounded font-mono">{status}: {count}</span>
                   ))}
                 </div>
               )}
@@ -376,8 +376,8 @@ export default function SalesHistoryUploadPage() {
 function Stat({ label, value, small }: { label: string; value: string; small?: boolean }) {
   return (
     <div>
-      <p className={`${small ? 'text-xs' : 'text-lg'} font-semibold text-green-900`}>{value}</p>
-      <p className="text-xs text-green-700">{label}</p>
+      <p className={`${small ? 'text-xs' : 'text-lg'} font-semibold text-[#0E5C56]`}>{value}</p>
+      <p className="text-xs text-[#0E5C56]">{label}</p>
     </div>
   )
       }
