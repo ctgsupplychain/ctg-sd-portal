@@ -36,65 +36,75 @@ type EditingCell = { id: number; field: string } | null
 
 const STATUS_OPTIONS = ['Open', 'Received', 'Cancelled', 'Closed']
 
-  // Editable cell renderer
-  function EditableCell({
-    id, field, value, align = 'right', display, inputType = 'text', selectOptions,
-  }: {
-    id: number
-    field: string
-    value: string | number | null
-    align?: 'left' | 'right'
-    display: React.ReactNode
-    inputType?: string
-    selectOptions?: string[]
-  }) {
-    const isEditing = editingCell?.id === id && editingCell?.field === field
-    const hasError = saveError?.id === id
+// Editable cell renderer
+function EditableCell({
+  id, field, value, align = 'right', display, inputType = 'text', selectOptions,
+  editingCell, saveError, inputRef, editValue, setEditValue, handleKeyDown, commitEdit, cancelEdit, startEdit,
+}: {
+  id: number
+  field: string
+  value: string | number | null
+  align?: 'left' | 'right'
+  display: React.ReactNode
+  inputType?: string
+  selectOptions?: string[]
+  editingCell: { id: number; field: string } | null
+  saveError: { id: number; msg: string } | null
+  inputRef: React.RefObject<HTMLInputElement | HTMLSelectElement>
+  editValue: string
+  setEditValue: (v: string) => void
+  handleKeyDown: (e: React.KeyboardEvent) => void
+  commitEdit: () => void
+  cancelEdit: () => void
+  startEdit: (id: number, field: string, value: string | number | null) => void
+}) {
+  const isEditing = editingCell?.id === id && editingCell?.field === field
+  const hasError = saveError?.id === id
 
-    if (isEditing) {
-      return (
-        <td className="px-2 py-1.5">
-          <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
-            {selectOptions ? (
-              <select
-                ref={inputRef as React.RefObject<HTMLSelectElement>}
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
-              >
-                {selectOptions.map(o => <option key={o}>{o}</option>)}
-              </select>
-            ) : (
-              <input
-                ref={inputRef as React.RefObject<HTMLInputElement>}
-                type={inputType}
-                inputMode={inputType === 'text' ? 'numeric' : inputType === 'decimal' ? 'decimal' : undefined}
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-24 text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
-              />
-            )}
-            <button onClick={commitEdit} className="text-[#0E5C56] hover:text-[#0E5C56]"><Check size={12} /></button>
-            <button onClick={cancelEdit} className="text-[#4B5563] hover:text-[#4B5563]"><X size={12} /></button>
-          </div>
-        </td>
-      )
-    }
-
+  if (isEditing) {
     return (
-      <td
-        className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-[#FAEAEA]' : 'hover:bg-[#DCEAE8]'}`}
-        onClick={() => startEdit(id, field, value)}
-        title="Click to edit"
-      >
-        <span className="group-hover:underline group-hover:decoration-dashed group-hover:decoration-teal-400 group-hover:underline-offset-2">
-          {display}
-        </span>
+      <td className="px-2 py-1.5">
+        <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+          {selectOptions ? (
+            <select
+              ref={inputRef as React.RefObject<HTMLSelectElement>}
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+            >
+              {selectOptions.map(o => <option key={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input
+              ref={inputRef as React.RefObject<HTMLInputElement>}
+              type={inputType === 'number' ? 'text' : inputType}
+              inputMode={inputType === 'number' ? 'numeric' : inputType === 'decimal' ? 'decimal' : undefined}
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-24 text-xs border border-[#0E5C56] rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400 text-right"
+            />
+          )}
+          <button onClick={commitEdit} className="text-[#0E5C56] hover:text-[#0E5C56]"><Check size={12} /></button>
+          <button onClick={cancelEdit} className="text-[#4B5563] hover:text-[#4B5563]"><X size={12} /></button>
+        </div>
       </td>
     )
   }
+
+  return (
+    <td
+      className={`px-3 py-2.5 cursor-pointer group ${align === 'right' ? 'text-right' : ''} ${hasError ? 'bg-[#FAEAEA]' : 'hover:bg-[#DCEAE8]'}`}
+      onClick={() => startEdit(id, field, value)}
+      title="Click to edit"
+    >
+      <span className="group-hover:underline group-hover:decoration-dashed group-hover:decoration-teal-400 group-hover:underline-offset-2">
+        {display}
+      </span>
+    </td>
+  )
+}
 
 
 export default function SupplyInputPage() {
@@ -453,16 +463,20 @@ export default function SupplyInputPage() {
                       <EditableCell
                         id={p.id} field="supplier_name" value={p.supplier_name} align="left"
                         display={<span className="text-xs text-[#4B5563]">{p.supplier_name || 'â'}</span>}
+                      
+                editingCell={editingCell} saveError={saveError} inputRef={inputRef as React.RefObject<HTMLInputElement | HTMLSelectElement>} editValue={editValue} setEditValue={setEditValue} handleKeyDown={handleKeyDown} commitEdit={commitEdit} cancelEdit={cancelEdit} startEdit={startEdit}
                       />
                       {/* Qty â editable */}
                       <EditableCell
                         id={p.id} field="qty" value={p.qty} inputType="number"
                         display={<span className="text-xs text-[#1F2937]">{p.qty?.toLocaleString()}</span>}
+                editingCell={editingCell} saveError={saveError} inputRef={inputRef as React.RefObject<HTMLInputElement | HTMLSelectElement>} editValue={editValue} setEditValue={setEditValue} handleKeyDown={handleKeyDown} commitEdit={commitEdit} cancelEdit={cancelEdit} startEdit={startEdit}
                       />
                       {/* Qty Shipped â editable */}
                       <EditableCell
                         id={p.id} field="qty_shipped" value={p.qty_shipped} inputType="number"
                         display={<span className="text-xs text-[#4B5563]">{(p.qty_shipped ?? 0).toLocaleString()}</span>}
+                editingCell={editingCell} saveError={saveError} inputRef={inputRef as React.RefObject<HTMLInputElement | HTMLSelectElement>} editValue={editValue} setEditValue={setEditValue} handleKeyDown={handleKeyDown} commitEdit={commitEdit} cancelEdit={cancelEdit} startEdit={startEdit}
                       />
                       {/* Balance â read only (server computed) */}
                       <td className="px-3 py-2.5 text-right">
@@ -474,6 +488,7 @@ export default function SupplyInputPage() {
                       <EditableCell
                         id={p.id} field="unit_price" value={p.unit_price} inputType="number"
                         display={<span className="font-mono text-xs text-[#1F2937]">{Number(p.unit_price ?? 0).toFixed(2)}</span>}
+                editingCell={editingCell} saveError={saveError} inputRef={inputRef as React.RefObject<HTMLInputElement | HTMLSelectElement>} editValue={editValue} setEditValue={setEditValue} handleKeyDown={handleKeyDown} commitEdit={commitEdit} cancelEdit={cancelEdit} startEdit={startEdit}
                       />
                       {/* Delivery date â editable */}
                       <EditableCell
@@ -483,6 +498,8 @@ export default function SupplyInputPage() {
                             ? <span className={`text-xs ${delayed ? 'text-[#C5453F] font-medium' : 'text-[#4B5563]'}`}>{p.delivery_date}</span>
                             : <span className="text-[#4B5563] text-xs">â</span>
                         }
+                      
+                editingCell={editingCell} saveError={saveError} inputRef={inputRef as React.RefObject<HTMLInputElement | HTMLSelectElement>} editValue={editValue} setEditValue={setEditValue} handleKeyDown={handleKeyDown} commitEdit={commitEdit} cancelEdit={cancelEdit} startEdit={startEdit}
                       />
                       {/* Receipt week â read only (derived) */}
                       <td className="px-3 py-2.5 text-right">
@@ -499,6 +516,8 @@ export default function SupplyInputPage() {
                             : 'bg-[#E4DDD3] text-[#4B5563]'
                           }`}>{p.status}</span>
                         }
+                      
+                editingCell={editingCell} saveError={saveError} inputRef={inputRef as React.RefObject<HTMLInputElement | HTMLSelectElement>} editValue={editValue} setEditValue={setEditValue} handleKeyDown={handleKeyDown} commitEdit={commitEdit} cancelEdit={cancelEdit} startEdit={startEdit}
                       />
                     </tr>
                   )
