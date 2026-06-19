@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Search, RefreshCw, Check, X } from 'lucide-react'
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Search, RefreshCw, Check, X, RefreshCcw } from 'lucide-react'
 import BackToSD from '@/components/layout/BackToSD'
 
 interface UploadResult {
@@ -12,6 +12,37 @@ interface UploadResult {
   upserted: number
   skipped: number
   invalid_skus: string[]
+}
+
+interface SyncPreviewRow {
+  po_number: string
+  sku: string
+  brand: string | null
+  supplier_name: string | null
+  qty: number
+  qty_shipped: number
+  balance_qty: number
+  status: string
+  delivery_date: string | null
+}
+
+interface SyncPreviewResult {
+  success: boolean
+  mode: 'preview'
+  total_rows: number
+  to_upsert: number
+  skipped_na_sku: number
+  skipped_non_myr: number
+  sample: SyncPreviewRow[]
+}
+
+interface SyncCommitResult {
+  success: boolean
+  mode: 'commit'
+  total_rows: number
+  upserted: number
+  skipped_na_sku: number
+  skipped_non_myr: number
 }
 
 interface PurchaseOrder {
@@ -136,10 +167,25 @@ export default function SupplyInputPage() {
   const [saveError, setSaveError] = useState<{ id: number; msg: string } | null>(null)
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
 
-  useEffect(() => { loadPos() }, [])
+  // Role + sheet sync state
+  const [role, setRole] = useState<string | null>(null)
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncPreview, setSyncPreview] = useState<SyncPreviewResult | null>(null)
+  const [syncCommitting, setSyncCommitting] = useState(false)
+  const [syncResult, setSyncResult] = useState<SyncCommitResult | null>(null)
+
+  useEffect(() => { loadPos(); loadRole() }, [])
   useEffect(() => {
     if (editingCell && inputRef.current) inputRef.current.focus()
   }, [editingCell])
+
+  async function loadRole() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    setRole(data?.role ?? null)
+  }
 
   async function loadPos() {
     setListLoading(true); setListError(null)
@@ -261,6 +307,61 @@ export default function SupplyInputPage() {
     }
   }
 
+  async function handleSyncPreview() {
+    setSyncLoading(true); setSyncError(null); setSyncResult(null); setSyncPreview(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+
+      const res = await fetch('/api/po-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ mode: 'preview' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Preview failed')
+      setSyncPreview(json)
+    } catch (e: any) {
+      setSyncError(e.message)
+    } finally {
+      setSyncLoading(false)
+    }
+  }
+
+  async function handleSyncCommit() {
+    setSyncCommitting(true); setSyncError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+
+      const res = await fetch('/api/po-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ mode: 'commit' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Sync failed')
+      setSyncResult(json)
+      setSyncPreview(null)
+      loadPos()
+    } catch (e: any) {
+      setSyncError(e.message)
+    } finally {
+      setSyncCommitting(false)
+    }
+  }
+
+  function cancelSyncPreview() {
+    setSyncPreview(null)
+    setSyncError(null)
+  }
+
   const statuses = ['All', ...STATUS_OPTIONS]
 
   const filtered = useMemo(() => pos.filter(p => {
@@ -379,6 +480,108 @@ export default function SupplyInputPage() {
       {/* âââââââââââââ PO List âââââââââââââ */}
       <div className="mt-10">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+      {/* ───────────── Sync from Sheet (supply_chain only) ───────────── */}
+      {role === 'supply_chain' && (
+        <div className="mt-8 bg-[#F4F2EE] border border-[#E4DDD3] rounded-xl px-4 py-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm font-medium text-[#1F2937]">Sync from Sheet</p>
+              <p className="text-xs text-[#4B5563] mt-0.5">Pull PO data from the PO Tracking Record Google Sheet (PO_Data tab).</p>
+            </div>
+            <button
+              onClick={handleSyncPreview}
+              disabled={syncLoading}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-[#0E5C56] hover:bg-[#0A4A45] disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <RefreshCcw size={12} className={syncLoading ? 'animate-spin' : ''} />
+              {syncLoading ? 'Loading preview...' : 'Sync from Sheet'}
+            </button>
+          </div>
+
+          {syncError && (
+            <div className="mt-3 bg-[#FAEAEA] border border-[#F5C6C4] rounded-lg px-4 py-3 flex gap-2">
+              <AlertCircle size={16} className="text-[#C5453F] flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-[#C5453F]">{syncError}</p>
+            </div>
+          )}
+
+          {syncResult && (
+            <div className="mt-3 bg-[#DCEAE8] border border-[#DCEAE8] rounded-lg px-4 py-3 flex items-center gap-2">
+              <CheckCircle size={16} className="text-[#2F9E68]" />
+              <p className="text-sm text-[#0E5C56]">
+                Sync complete — {syncResult.upserted} records upserted from {syncResult.total_rows} sheet rows
+                {syncResult.skipped_na_sku > 0 && <span> ({syncResult.skipped_na_sku} N/A SKU skipped)</span>}.
+              </p>
+            </div>
+          )}
+
+          {syncPreview && (
+            <div className="mt-3 border border-[#E4DDD3] rounded-lg bg-white px-4 py-4">
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-[#F4F2EE] rounded-lg px-3 py-2.5">
+                  <p className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wide mb-1">Rows to Upsert</p>
+                  <p className="text-lg font-semibold text-[#1F2937]">{syncPreview.to_upsert}</p>
+                </div>
+                <div className="bg-[#F4F2EE] rounded-lg px-3 py-2.5">
+                  <p className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wide mb-1">Skipped (N/A SKU)</p>
+                  <p className="text-lg font-semibold text-[#1F2937]">{syncPreview.skipped_na_sku}</p>
+                </div>
+                <div className="bg-[#F4F2EE] rounded-lg px-3 py-2.5">
+                  <p className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wide mb-1">Skipped (Non-MYR)</p>
+                  <p className="text-lg font-semibold text-[#1F2937]">{syncPreview.skipped_non_myr}</p>
+                </div>
+              </div>
+
+              {syncPreview.sample.length > 0 && (
+                <div className="border border-[#E4DDD3] rounded-lg overflow-x-auto mb-4">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-[#F4F2EE] border-b border-[#E4DDD3]">
+                        {['PO Number', 'SKU', 'Supplier', 'Qty', 'Shipped', 'Balance', 'Status', 'Delivery Date'].map((h, i) => (
+                          <th key={h} className={`px-3 py-2 font-medium text-[#4B5563] uppercase tracking-wide text-[10px] whitespace-nowrap ${i < 3 ? 'text-left' : 'text-right'}`}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {syncPreview.sample.map((r, i) => (
+                        <tr key={`${r.po_number}-${r.sku}-${i}`} className="border-b border-[#E4DDD3] last:border-0">
+                          <td className="px-3 py-2"><span className="font-mono text-[11px] text-[#1F2937]">{r.po_number}</span></td>
+                          <td className="px-3 py-2"><span className="font-mono text-[11px] text-[#1F2937]">{r.sku}</span></td>
+                          <td className="px-3 py-2 text-xs text-[#4B5563]">{r.supplier_name || '—'}</td>
+                          <td className="px-3 py-2 text-right text-xs text-[#1F2937]">{r.qty?.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-xs text-[#4B5563]">{r.qty_shipped?.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-xs text-[#4B5563]">{r.balance_qty?.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-xs text-[#4B5563]">{r.status}</td>
+                          <td className="px-3 py-2 text-right text-xs text-[#4B5563]">{r.delivery_date || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="text-[10px] text-[#4B5563] px-3 py-1.5 bg-[#F4F2EE]">Showing first {syncPreview.sample.length} of {syncPreview.to_upsert} rows to upsert</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSyncCommit}
+                  disabled={syncCommitting || syncPreview.to_upsert === 0}
+                  className="text-xs font-medium text-white bg-[#0E5C56] hover:bg-[#0A4A45] disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {syncCommitting ? 'Syncing...' : `Confirm Sync (${syncPreview.to_upsert} records)`}
+                </button>
+                <button
+                  onClick={cancelSyncPreview}
+                  disabled={syncCommitting}
+                  className="text-xs font-medium text-[#4B5563] border border-[#E4DDD3] px-3 py-1.5 rounded-lg bg-white hover:bg-[#F4F2EE] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
           <h2 className="text-sm font-semibold text-[#1F2937]">Current Open POs</h2>
           <button
             onClick={loadPos}
