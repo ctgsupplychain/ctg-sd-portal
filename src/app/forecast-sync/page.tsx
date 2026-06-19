@@ -14,6 +14,81 @@ interface SyncResult {
   error?: string
 }
 
+interface TrendRow {
+  project: string
+  brand: string
+  company: string
+  subs: number
+  prevTotal: number | null
+  latestTotal: number
+  deltaPct: number | null
+  status: 'up' | 'down' | 'volatile' | 'single'
+  spark: number[]
+}
+
+// Snapshot from CTG Sales Forecast Google Sheet, W18-W25/2026 — recon view, not live-queried.
+// Sorted by submission count, descending.
+const TREND_DATA: TrendRow[] = [
+  { project: 'BeYoute', brand: 'Bonlife', company: 'CTG Wellness', subs: 5, prevTotal: 3600, latestTotal: 3200, deltaPct: -11.1, status: 'down', spark: [2400, 2399, 2450, 3600, 3200] },
+  { project: 'Master Nerv', brand: 'Mejorecare', company: 'CTG Wellness', subs: 5, prevTotal: 5750, latestTotal: 6400, deltaPct: 11.3, status: 'up', spark: [5750, 5500, 5500, 5750, 6400] },
+  { project: 'Skindae', brand: 'Skindae', company: 'Skindae', subs: 4, prevTotal: 11400, latestTotal: 11800, deltaPct: 3.5, status: 'up', spark: [10300, 11200, 11400, 11800] },
+  { project: 'iLady', brand: 'iProcare', company: 'Iprocare', subs: 3, prevTotal: 15600, latestTotal: 18172, deltaPct: 16.5, status: 'up', spark: [15400, 15600, 18172] },
+  { project: 'KATA', brand: 'KATA', company: 'Minfinity', subs: 3, prevTotal: 8600, latestTotal: 7694, deltaPct: -10.5, status: 'down', spark: [6450, 8600, 7694] },
+  { project: 'Recovery', brand: 'Naturelish', company: 'Oasis CTG', subs: 3, prevTotal: 7000, latestTotal: 7500, deltaPct: 7.1, status: 'up', spark: [6596, 7000, 7500] },
+  { project: 'IsoKae', brand: 'Naturelish', company: 'Zen E Wellness', subs: 3, prevTotal: 2000, latestTotal: 2850, deltaPct: 42.5, status: 'volatile', spark: [3900, 2000, 2850] },
+  { project: 'Jeeroul', brand: 'Jeeroul', company: 'CTG4u Jeeroul', subs: 3, prevTotal: 1210, latestTotal: 2510, deltaPct: 107.4, status: 'volatile', spark: [56, 1210, 2510] },
+  { project: 'Mformula', brand: 'Naturelish', company: 'Oasis CTG', subs: 2, prevTotal: 13340, latestTotal: 15100, deltaPct: 13.2, status: 'up', spark: [13340, 15100] },
+  { project: 'LivAct', brand: 'Wellsprings', company: 'CTG Wellness', subs: 2, prevTotal: 3600, latestTotal: 3350, deltaPct: -6.9, status: 'down', spark: [3600, 3350] },
+  { project: 'URO360', brand: 'Naturelish', company: 'Naturelish', subs: 2, prevTotal: 2150, latestTotal: 2640, deltaPct: 22.8, status: 'up', spark: [2150, 2640] },
+  { project: 'Dr. Smile', brand: 'Dr. Smile', company: 'DrSmile Whitening', subs: 1, prevTotal: null, latestTotal: 10550, deltaPct: null, status: 'single', spark: [10550] },
+  { project: 'Reneicare', brand: 'GoHerb', company: 'GoHerb', subs: 1, prevTotal: null, latestTotal: 6700, deltaPct: null, status: 'single', spark: [6700] },
+  { project: 'Ninoko', brand: 'Ninoko', company: 'Oasis CTG', subs: 1, prevTotal: null, latestTotal: 5900, deltaPct: null, status: 'single', spark: [5900] },
+  { project: 'Moesie', brand: 'Moesie', company: 'Nuan Nuan', subs: 1, prevTotal: null, latestTotal: 4550, deltaPct: null, status: 'single', spark: [4550] },
+  { project: 'Mplus', brand: 'Mplus', company: 'M PLUS SKINPRO', subs: 1, prevTotal: null, latestTotal: 3850, deltaPct: null, status: 'single', spark: [3850] },
+  { project: 'Bugucare', brand: 'Naturelish', company: 'Naturelish', subs: 1, prevTotal: null, latestTotal: 3850, deltaPct: null, status: 'single', spark: [3850] },
+  { project: 'M.Placenta', brand: 'Mizino', company: 'Leaf Cottage', subs: 1, prevTotal: null, latestTotal: 2980, deltaPct: null, status: 'single', spark: [2980] },
+  { project: 'M.Chocolate', brand: 'Mizino', company: 'CTG Ricebow', subs: 1, prevTotal: null, latestTotal: 2400, deltaPct: null, status: 'single', spark: [2400] },
+  { project: 'Pomegranate', brand: 'GoHerb', company: 'GoHerb', subs: 1, prevTotal: null, latestTotal: 2000, deltaPct: null, status: 'single', spark: [2000] },
+  { project: 'Eco Plus', brand: 'Naturelish', company: 'GTI', subs: 1, prevTotal: null, latestTotal: 1899, deltaPct: null, status: 'single', spark: [1899] },
+  { project: 'Agepros', brand: 'SwissMed', company: 'Gold Waves', subs: 1, prevTotal: null, latestTotal: 1830, deltaPct: null, status: 'single', spark: [1830] },
+  { project: 'M.Enzyme', brand: 'Mizino', company: 'CTG Ricebow', subs: 1, prevTotal: null, latestTotal: 1750, deltaPct: null, status: 'single', spark: [1750] },
+]
+
+function Sparkline({ values, status }: { values: number[]; status: TrendRow['status'] }) {
+  if (values.length < 2) return <span className="text-xs" style={{ color: '#98A2B3' }}>&mdash;</span>
+  const w = 70, h = 22, pad = 2
+  const min = Math.min(...values), max = Math.max(...values)
+  const range = max - min || 1
+  const pts = values.map((v, i) => {
+    const x = pad + (i * (w - pad * 2)) / (values.length - 1)
+    const y = h - pad - ((v - min) / range) * (h - pad * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+  const color = status === 'down' ? '#C5453F' : status === 'volatile' ? '#E8A33D' : '#2F9E68'
+  const [lastX, lastY] = pts[pts.length - 1].split(',')
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth={2} />
+      <circle cx={lastX} cy={lastY} r={2.5} fill={color} />
+    </svg>
+  )
+}
+
+function StatusTag({ status }: { status: TrendRow['status'] }) {
+  const map = {
+    up: { bg: '#E1F5EE', fg: '#085041', label: 'Trending up' },
+    down: { bg: '#FAEAEA', fg: '#C5453F', label: 'Trending down' },
+    volatile: { bg: '#FBEFD9', fg: '#85530B', label: 'Volatile — review' },
+    single: { bg: '#F4F2EE', fg: '#4B5563', label: 'Single submission' },
+  } as const
+  const s = map[status]
+  return (
+    <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: s.bg, color: s.fg }}>
+      {s.label}
+    </span>
+  )
+}
+
 export default function ForecastSyncPage() {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +128,7 @@ export default function ForecastSyncPage() {
   const unmappedCount = results.filter(r => r.synced && !r.project_id).length
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
+    <div className="max-w-4xl mx-auto px-6 py-10">
       <div className="flex items-center gap-3 mb-6">
         <BackToSD />
         <div className="w-px h-4" style={{ background: '#E4DDD3' }} />
@@ -124,6 +199,64 @@ export default function ForecastSyncPage() {
           </div>
         </div>
       )}
+
+      <div className="mt-10 pt-8" style={{ borderTop: '1px solid #E4DDD3' }}>
+        <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
+          <h2 className="text-sm font-semibold" style={{ color: '#1F2937' }}>Forecast on record</h2>
+          <span className="text-xs" style={{ color: '#98A2B3' }}>
+            sorted by submission count, descending
+          </span>
+        </div>
+        <p className="text-xs mb-1" style={{ color: '#4B5563', opacity: 0.7 }}>
+          Snapshot from the Google Sheet (W18&ndash;W25/2026, 22 projects) &mdash; not yet wired to a live query. Refresh this section after each sync run is automated.
+        </p>
+        <div className="rounded-xl overflow-hidden mt-4" style={{ border: '1px solid #E4DDD3' }}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: '#F4F2EE', borderBottom: '1px solid #E4DDD3' }}>
+                {['Project', 'Brand', 'Company', 'Subs', 'Trend', 'Prior', 'Latest', 'Δ', 'Status'].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-3 py-2 text-xs font-medium ${i < 3 ? 'text-left' : 'text-right'}`}
+                    style={{ color: '#4B5563' }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {TREND_DATA.map(row => (
+                <tr key={row.project} style={{ borderBottom: '1px solid #F4F2EE' }}>
+                  <td className="px-3 py-2 font-medium" style={{ color: '#1F2937' }}>{row.project}</td>
+                  <td className="px-3 py-2" style={{ color: '#4B5563' }}>{row.brand}</td>
+                  <td className="px-3 py-2" style={{ color: '#4B5563' }}>{row.company}</td>
+                  <td className="px-3 py-2 text-right" style={{ color: '#4B5563', fontFamily: 'monospace' }}>{row.subs}</td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="inline-flex justify-end"><Sparkline values={row.spark} status={row.status} /></span>
+                  </td>
+                  <td className="px-3 py-2 text-right" style={{ color: '#4B5563', fontFamily: 'monospace' }}>
+                    {row.prevTotal !== null ? row.prevTotal.toLocaleString() : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-right" style={{ color: '#1F2937', fontFamily: 'monospace' }}>
+                    {row.latestTotal.toLocaleString()}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-right font-medium"
+                    style={{ fontFamily: 'monospace', color: row.deltaPct === null ? '#98A2B3' : row.deltaPct >= 0 ? '#2F9E68' : '#C5453F' }}
+                  >
+                    {row.deltaPct === null ? '—' : `${row.deltaPct >= 0 ? '▲' : '▼'} ${Math.abs(row.deltaPct)}%`}
+                  </td>
+                  <td className="px-3 py-2 text-right"><StatusTag status={row.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs mt-2" style={{ color: '#98A2B3' }}>
+          Volatile = |Δ| &gt; 30% vs prior submission &mdash; likely needs owner follow-up before trusting the number.
+        </p>
+      </div>
     </div>
   )
 }
