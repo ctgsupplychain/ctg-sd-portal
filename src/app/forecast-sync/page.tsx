@@ -247,4 +247,111 @@ export default function ForecastSyncPage() {
                   <td className="px-3 py-2 font-medium" style={{ color: '#1F2937' }}>{row.project}</td>
                   <td className="px-3 py-2" style={{ color: '#4B5563' }}>{row.brand}</td>
                   <td className="px-3 py-2" style={{ color: '#4B5563' }}>{row.company}</td>
-                  <td className="px-3 py-2 te
+                  <td className="px-3 py-2 text-right" style={{ color: '#4B5563', fontFamily: 'monospace' }}>{row.subs}</td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="inline-flex justify-end"><Sparkline values={row.spark} status={row.status} /></span>
+                  </td>
+                  <td className="px-3 py-2 text-right" style={{ color: '#4B5563', fontFamily: 'monospace' }}>
+                    {row.prevTotal !== null ? row.prevTotal.toLocaleString() : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-right" style={{ color: '#1F2937', fontFamily: 'monospace' }}>
+                    {row.latestTotal.toLocaleString()}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-right font-medium"
+                    style={{ fontFamily: 'monospace', color: row.deltaPct === null ? '#98A2B3' : row.deltaPct >= 0 ? '#2F9E68' : '#C5453F' }}
+                  >
+                    {row.deltaPct === null ? '—' : `${row.deltaPct >= 0 ? '▲' : '▼'} ${Math.abs(row.deltaPct)}%`}
+                  </td>
+                  <td className="px-3 py-2 text-right"><StatusTag status={row.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs mt-2" style={{ color: '#98A2B3' }}>
+          Volatile = |Δ| &gt; 30% vs prior submission &mdash; likely needs owner follow-up before trusting the number.
+        </p>
+
+        <div className="grid gap-3 mt-6" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
+          <div className="rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+            <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+              <span className="text-sm font-semibold" style={{ color: '#1F2937' }}>Near-term curve &mdash; top 5 projects</span>
+              <span className="text-xs" style={{ color: '#98A2B3' }}>first 6 non-zero months, latest submission</span>
+            </div>
+            <svg viewBox="0 0 560 200" style={{ width: '100%', height: 'auto' }}>
+              <line x1="46" y1="22" x2="46" y2="162" stroke="rgba(15,40,30,0.14)" strokeWidth="1" />
+              <line x1="46" y1="162" x2="540" y2="162" stroke="rgba(15,40,30,0.14)" strokeWidth="1" />
+              <polyline points="46,128 128,140 210,140 292,118 374,130 456,118" fill="none" stroke="#1D9E75" strokeWidth="2.2" />
+              <polyline points="46,150 128,150 210,140 292,140 374,118 456,96" fill="none" stroke="#378ADD" strokeWidth="2.2" />
+              <polyline points="46,108 128,72 210,72 292,72 374,72 456,72" fill="none" stroke="#EF9F27" strokeWidth="2.2" />
+              <polyline points="46,114 128,130 210,121 292,96 374,114 456,84" fill="none" stroke="#E24B4A" strokeWidth="2.2" />
+              <polyline points="46,128 128,128 210,96 292,150 374,96 456,68" fill="none" stroke="#8B948F" strokeWidth="2.2" strokeDasharray="4 3" />
+              <text x="42" y="26" fontFamily="IBM Plex Sans, sans-serif" fontSize="9.5" fill="#8B948F" textAnchor="end">units/mo</text>
+              <text x="46" y="180" fontFamily="IBM Plex Sans, sans-serif" fontSize="9.5" fill="#8B948F">mo 1</text>
+              <text x="512" y="180" fontFamily="IBM Plex Sans, sans-serif" fontSize="9.5" fill="#8B948F">mo 6</text>
+            </svg>
+            <div className="flex flex-wrap gap-3 mt-2 text-xs" style={{ color: '#98A2B3' }}>
+              {[
+                { c: '#1D9E75', label: 'iLady' },
+                { c: '#378ADD', label: 'Mformula' },
+                { c: '#EF9F27', label: 'Skindae' },
+                { c: '#E24B4A', label: 'Dr. Smile' },
+                { c: '#8B948F', label: 'KATA' },
+              ].map(item => (
+                <span key={item.label} className="inline-flex items-center gap-1">
+                  <i style={{ width: 9, height: 2, display: 'inline-block', borderRadius: 2, background: item.c }} />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl p-4" style={{ border: '1px solid #E4DDD3' }}>
+            <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+              <span className="text-sm font-semibold" style={{ color: '#1F2937' }}>Submission cadence</span>
+              <span className="text-xs" style={{ color: '#98A2B3' }}>weeks with a row, per project</span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid #F4F2EE' }}>
+                  <th className="text-left text-xs font-medium pb-2" style={{ color: '#4B5563' }}>Project</th>
+                  <th className="text-right text-xs font-medium pb-2" style={{ color: '#4B5563' }}>W18&hellip;W25</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { project: 'Master Nerv', weeks: [1, 1, 0, 1, 1, 0, 1, 0] },
+                  { project: 'BeYoute', weeks: [1, 1, 0, 1, 1, 0, 1, 0] },
+                  { project: 'Skindae', weeks: [1, 1, 0, 0, 0, 1, 1, 0] },
+                  { project: 'Jeeroul', weeks: [1, 0, 0, 1, 0, 1, 0, 0] },
+                  { project: 'iLady', weeks: [1, 0, 0, 1, 1, 0, 0, 0] },
+                ].map(row => (
+                  <tr key={row.project} style={{ borderBottom: '1px solid #F4F2EE' }}>
+                    <td className="py-2 text-sm" style={{ color: '#1F2937' }}>{row.project}</td>
+                    <td className="py-2">
+                      <div className="flex justify-end gap-1">
+                        {row.weeks.map((on, i) => (
+                          <i
+                            key={i}
+                            style={{
+                              width: 5, height: 5, borderRadius: '50%', display: 'inline-block',
+                              background: on ? '#1D9E75' : 'rgba(15,40,30,0.16)',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-xs mt-3" style={{ color: '#98A2B3' }}>
+              Most projects submit every 1&ndash;3 weeks, not weekly &mdash; sync logic&apos;s &ldquo;fallback to most recent&rdquo; is doing real work here.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
