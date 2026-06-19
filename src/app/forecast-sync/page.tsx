@@ -201,6 +201,22 @@ export default function ForecastSyncPage() {
       )}
 
       <div className="mt-10 pt-8" style={{ borderTop: '1px solid #E4DDD3' }}>
+        <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+          {[
+            { label: 'Projects tracked', value: '22', hint: 'across 24 companies', bg: '#FFFFFF', border: '#E4DDD3', fg: '#1F2937', fgHint: '#98A2B3' },
+            { label: 'Revised up', value: '9', hint: 'vs prior submission', bg: '#E4F4EE', border: 'transparent', fg: '#0F6E56', fgHint: '#0F6E56' },
+            { label: 'Revised down', value: '3', hint: 'vs prior submission', bg: '#FBEAEA', border: 'transparent', fg: '#A32D2D', fgHint: '#A32D2D' },
+            { label: 'Single submission', value: '10', hint: 'no trend yet — flag', bg: '#FBEFD9', border: 'transparent', fg: '#85530B', fgHint: '#85530B' },
+            { label: 'Total forecast', value: '142.0k', hint: 'latest, all projects', bg: '#FFFFFF', border: '#E4DDD3', fg: '#1F2937', fgHint: '#98A2B3' },
+          ].map(kpi => (
+            <div key={kpi.label} className="rounded-xl p-3" style={{ background: kpi.bg, border: kpi.border !== 'transparent' ? `1px solid ${kpi.border}` : undefined }}>
+              <div className="text-xs font-medium" style={{ color: kpi.fg, opacity: 0.85 }}>{kpi.label}</div>
+              <div className="text-2xl font-medium mt-0.5" style={{ color: kpi.fg, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>{kpi.value}</div>
+              <div className="text-xs mt-0.5" style={{ color: kpi.fgHint, opacity: 0.8 }}>{kpi.hint}</div>
+            </div>
+          ))}
+        </div>
+
         <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
           <h2 className="text-sm font-semibold" style={{ color: '#1F2937' }}>Forecast on record</h2>
           <span className="text-xs" style={{ color: '#98A2B3' }}>
@@ -231,32 +247,4 @@ export default function ForecastSyncPage() {
                   <td className="px-3 py-2 font-medium" style={{ color: '#1F2937' }}>{row.project}</td>
                   <td className="px-3 py-2" style={{ color: '#4B5563' }}>{row.brand}</td>
                   <td className="px-3 py-2" style={{ color: '#4B5563' }}>{row.company}</td>
-                  <td className="px-3 py-2 text-right" style={{ color: '#4B5563', fontFamily: 'monospace' }}>{row.subs}</td>
-                  <td className="px-3 py-2 text-right">
-                    <span className="inline-flex justify-end"><Sparkline values={row.spark} status={row.status} /></span>
-                  </td>
-                  <td className="px-3 py-2 text-right" style={{ color: '#4B5563', fontFamily: 'monospace' }}>
-                    {row.prevTotal !== null ? row.prevTotal.toLocaleString() : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right" style={{ color: '#1F2937', fontFamily: 'monospace' }}>
-                    {row.latestTotal.toLocaleString()}
-                  </td>
-                  <td
-                    className="px-3 py-2 text-right font-medium"
-                    style={{ fontFamily: 'monospace', color: row.deltaPct === null ? '#98A2B3' : row.deltaPct >= 0 ? '#2F9E68' : '#C5453F' }}
-                  >
-                    {row.deltaPct === null ? '—' : `${row.deltaPct >= 0 ? '▲' : '▼'} ${Math.abs(row.deltaPct)}%`}
-                  </td>
-                  <td className="px-3 py-2 text-right"><StatusTag status={row.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs mt-2" style={{ color: '#98A2B3' }}>
-          Volatile = |Δ| &gt; 30% vs prior submission &mdash; likely needs owner follow-up before trusting the number.
-        </p>
-      </div>
-    </div>
-  )
-}
+                  <td className="px-3 py-2 te
