@@ -163,17 +163,30 @@ interface SyncPreview {
   toUpsert: MappedRow[]
   skippedNaSku: number
   skippedNonMyr: number
+  skippedUnknownSku: number
+  unknownSkus: string[]
   totalRows: number
 }
 
 function buildPreview(rows: Record<string, string>[], brandBySku: Record<string, string>): SyncPreview {
   let skippedNaSku = 0
+  let skippedUnknownSku = 0
+  const unknownSkuSet = new Set<string>()
   const skippedNonMyr = 0 // no currency column in sheet — always 0 for now
   const toUpsert: MappedRow[] = []
 
   for (const row of rows) {
     const skuRaw = (row['SKU'] || '').trim()
     if (!skuRaw || skuRaw.toUpperCase() === 'N/A') { skippedNaSku++; continue }
+
+    // SKU must exist in master_sku — purchase_orders.sku has an FK constraint
+    // against master_sku.sku. Skip unmapped SKUs here instead of letting the
+    // whole upsert batch fail on a single FK violation.
+    if (!(skuRaw in brandBySku)) {
+      skippedUnknownSku++
+      unknownSkuSet.add(skuRaw)
+      continue
+    }
 
     const qty = num(row['Order Qty'])
     const qtyShipped = num(row['Delivered Qty'])
@@ -228,7 +241,14 @@ function buildPreview(rows: Record<string, string>[], brandBySku: Record<string,
     })
   }
 
-  return { toUpsert, skippedNaSku, skippedNonMyr, totalRows: rows.length }
+  return {
+    toUpsert,
+    skippedNaSku,
+    skippedNonMyr,
+    skippedUnknownSku,
+    unknownSkus: Array.from(unknownSkuSet).sort(),
+    totalRows: rows.length,
+  }
 }
 
 // ── Route ───────────────────────────────────────────────────────────────────
@@ -266,6 +286,8 @@ export async function POST(req: NextRequest) {
         to_upsert: preview.toUpsert.length,
         skipped_na_sku: preview.skippedNaSku,
         skipped_non_myr: preview.skippedNonMyr,
+        skipped_unknown_sku: preview.skippedUnknownSku,
+        unknown_skus: preview.unknownSkus,
         sample: preview.toUpsert.slice(0, 10),
       })
     }
@@ -298,6 +320,8 @@ export async function POST(req: NextRequest) {
       upserted: count ?? records.length,
       skipped_na_sku: preview.skippedNaSku,
       skipped_non_myr: preview.skippedNonMyr,
+      skipped_unknown_sku: preview.skippedUnknownSku,
+      unknown_skus: preview.unknownSkus,
     })
 
   } catch (err: any) {

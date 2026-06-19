@@ -33,6 +33,8 @@ interface SyncPreviewResult {
   to_upsert: number
   skipped_na_sku: number
   skipped_non_myr: number
+  skipped_unknown_sku: number
+  unknown_skus: string[]
   sample: SyncPreviewRow[]
 }
 
@@ -43,6 +45,8 @@ interface SyncCommitResult {
   upserted: number
   skipped_na_sku: number
   skipped_non_myr: number
+  skipped_unknown_sku: number
+  unknown_skus: string[]
 }
 
 interface PurchaseOrder {
@@ -510,14 +514,15 @@ export default function SupplyInputPage() {
               <CheckCircle size={16} className="text-[#2F9E68]" />
               <p className="text-sm text-[#0E5C56]">
                 Sync complete — {syncResult.upserted} records upserted from {syncResult.total_rows} sheet rows
-                {syncResult.skipped_na_sku > 0 && <span> ({syncResult.skipped_na_sku} N/A SKU skipped)</span>}.
+                {syncResult.skipped_na_sku > 0 && <span> ({syncResult.skipped_na_sku} N/A SKU skipped)</span>}
+                {syncResult.skipped_unknown_sku > 0 && <span> ({syncResult.skipped_unknown_sku} unmapped SKU skipped)</span>}.
               </p>
             </div>
           )}
 
           {syncPreview && (
             <div className="mt-3 border border-[#E4DDD3] rounded-lg bg-white px-4 py-4">
-              <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="grid grid-cols-4 gap-3 mb-4">
                 <div className="bg-[#F4F2EE] rounded-lg px-3 py-2.5">
                   <p className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wide mb-1">Rows to Upsert</p>
                   <p className="text-lg font-semibold text-[#1F2937]">{syncPreview.to_upsert}</p>
@@ -530,7 +535,22 @@ export default function SupplyInputPage() {
                   <p className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wide mb-1">Skipped (Non-MYR)</p>
                   <p className="text-lg font-semibold text-[#1F2937]">{syncPreview.skipped_non_myr}</p>
                 </div>
+                <div className="bg-[#F4F2EE] rounded-lg px-3 py-2.5">
+                  <p className="text-[10px] font-medium text-[#4B5563] uppercase tracking-wide mb-1">Skipped (Unmapped SKU)</p>
+                  <p className="text-lg font-semibold text-[#1F2937]">{syncPreview.skipped_unknown_sku}</p>
+                </div>
               </div>
+
+              {syncPreview.unknown_skus.length > 0 && (
+                <div className="mb-4 bg-[#FCF3E3] border border-[#F0DDB3] rounded-lg px-4 py-3">
+                  <p className="text-xs font-medium text-[#8A5A1E] mb-1">
+                    {syncPreview.unknown_skus.length} SKU{syncPreview.unknown_skus.length > 1 ? 's' : ''} not found in master_sku — these rows will be skipped:
+                  </p>
+                  <p className="text-xs text-[#8A5A1E] font-mono break-words">
+                    {syncPreview.unknown_skus.join(', ')}
+                  </p>
+                </div>
+              )}
 
               {syncPreview.sample.length > 0 && (
                 <div className="border border-[#E4DDD3] rounded-lg overflow-x-auto mb-4">
