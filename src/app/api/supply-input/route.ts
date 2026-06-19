@@ -20,6 +20,16 @@ function parseDate(val: any): string | null {
   if (ddmm) return `${ddmm[3]}-${ddmm[2].padStart(2,'0')}-${ddmm[1].padStart(2,'0')}`
   // YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+  // D-Mon-YYYY or DD-Mon-YYYY (e.g. "9-Jan-2026", "22-Jan-2026")
+  const MONTHS: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  }
+  const dmonY = str.match(/^(\d{1,2})-([A-Za-z]{3,})-(\d{4})$/)
+  if (dmonY) {
+    const mon = MONTHS[dmonY[2].slice(0, 3).toLowerCase()]
+    if (mon) return `${dmonY[3]}-${mon}-${dmonY[1].padStart(2, '0')}`
+  }
   // Excel serial number
   const num = parseFloat(str)
   if (!isNaN(num) && num > 40000) {
